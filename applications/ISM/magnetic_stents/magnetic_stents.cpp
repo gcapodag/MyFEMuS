@@ -353,7 +353,7 @@ int main(int argc, char **args) {
 
 
   //BEGIN INITIALIZE PARTICLES
-  unsigned pSize = 50;
+  unsigned pSize = 100.;
   double PI = acos(-1.);
   std::vector < std::vector < double > > x(pSize);
   std::vector < MarkerType > markerType(pSize);
@@ -530,7 +530,7 @@ int main(int argc, char **args) {
               linea[configuration][partSim][i]->AdvectionParallel(150, 1. / itPeriod, 4, MagneticForceStents);
             }
             else if(simulation == 4) {
-              linea[configuration][partSim][i]->AdvectionParallel(150, 1. / itPeriod, 4, MagneticForceSC /*NULL*/);
+              linea[configuration][partSim][i]->AdvectionParallel(150, 1. / itPeriod, 4, MagneticForceWire /*NULL*/);
             }
             count_out += linea[configuration][partSim][i]->NumberOfParticlesOutsideTheDomain();
           }
@@ -567,6 +567,12 @@ int main(int argc, char **args) {
         output_path << "./output/particles-" << configuration << "-" << diam;
 
         PrintLine(output_path.str(), streamline, true, time_step + 1);
+
+        if(time_step >= /*1. / itPeriod*/ /*2.5*/ 1. * itPeriod) {
+          linea[configuration][partSim].resize(time_step - itPeriod + 2);
+          linea[configuration][partSim][time_step - itPeriod + 1] =  new Line(x, markerType, ml_sol.GetLevel(numberOfUniformRefinedMeshes - 1), 2);
+	  }
+        
       }
     }
     //}
@@ -957,52 +963,70 @@ void MagneticForceWire(const std::vector <double> & xMarker, std::vector <double
   std::vector <double> v(3);    //direction vector of the line that identifies the infinite wire
   std::vector <double> x(3);    //point that with v identifies the line of the wire
 
-  if(configuration == 0) {
+  if(simulation == 4) {
 
-    x[0] = 0.02093036072;
-    x[1] = 0.02093036072;
+    I = 2 * 1.e6;
+
+    v[0] = 0. ;
+    v[1] = 0. ;
+    v[2] = - 1. ;
+
+    x[0] = -0.006255 - 0.0275 * sqrt(2) * 0.5 ;
+    x[1] = 0.0064013 + 0.0275 * sqrt(2) * 0.5 ;
     x[2] = 0.;
 
-    v[0] = 0.;
-    v[1] = 0.;
-    v[2] = -1.;
-
   }
 
-  else if(configuration == 1) {
+  else {
 
-    x[0] = 0.006788225;
-    x[1] = 0.006788225;
-    x[2] = 0.;
+    if(configuration == 0) {
 
-    v[0] = 0.;
-    v[1] = 0.;
-    v[2] = -1.;
+      x[0] = 0.02093036072;
+      x[1] = 0.02093036072;
+      x[2] = 0.;
 
-  }
+      v[0] = 0.;
+      v[1] = 0.;
+      v[2] = -1.;
 
-  else if(configuration == 2) {
+    }
 
-    x[0] = 0.0196 * sqrt(2) / 2;
-    x[1] = 0.0196 * sqrt(2) / 2;
-    x[2] = 0.01;
+    else if(configuration == 1) {
 
-    v[0] = sqrt(2) / 2.;
-    v[1] = sqrt(2) / 2.;
-    v[2] = 0.;
+      x[0] = 0.006788225;
+      x[1] = 0.006788225;
+      x[2] = 0.;
 
-  }
+      v[0] = 0.;
+      v[1] = 0.;
+      v[2] = -1.;
+
+    }
+
+    else if(configuration == 2) {
+
+      x[0] = 0.0196 * sqrt(2) / 2;
+      x[1] = 0.0196 * sqrt(2) / 2;
+      x[2] = 0.01;
+
+      v[0] = sqrt(2) / 2.;
+      v[1] = sqrt(2) / 2.;
+      v[2] = 0.;
+
+    }
 
 
-  else if(configuration == 3) {
+    else if(configuration == 3) {
 
-    x[0] = 0.0196 * sqrt(2) / 2;
-    x[1] = 0.0196 * sqrt(2) / 2;
-    x[2] = 0.01;
+      x[0] = 0.0196 * sqrt(2) / 2;
+      x[1] = 0.0196 * sqrt(2) / 2;
+      x[2] = 0.01;
 
-    v[0] = - sqrt(2) / 2.;
-    v[1] = sqrt(2) / 2.;
-    v[2] = 0.;
+      v[0] = - sqrt(2) / 2.;
+      v[1] = sqrt(2) / 2.;
+      v[2] = 0.;
+
+    }
 
   }
 
@@ -1129,77 +1153,77 @@ void MagneticForceSC(const std::vector <double> & xMarker, std::vector <double> 
   std::vector <double> v(3);
   std::vector <double> x(3);
 
-    if(simulation == 4) {
+  if(simulation == 4) {
 
     v[0] = sqrt(2) * 0.5 ;
     v[1] = - sqrt(2) * 0.5 ;
     v[2] = 0.;
- 
-    x[0] = -0.006255 - 0.0175 * sqrt(2) * 0.5 ;
-    x[1] = 0.0064013 + 0.0175 * sqrt(2) * 0.5 ;
+
+    x[0] = -0.006255 - 0.0275 * sqrt(2) * 0.5 ;
+    x[1] = 0.0064013 + 0.0275 * sqrt(2) * 0.5 ;
     x[2] = 0.;
 
   }
-  
-  else{
-  
-  if(configuration == 0) {    //conf1 with z = 1.75 cm
-    v[0] = 0.;
-    v[1] = -1.;
-    v[2] = 0.;
 
-    x[0] = -0.002065;
-    x[1] = -0.019932;
-    x[2] = 0.000169;
-  }
-  else if(configuration == 1) {    //conf2 with z =1.75 cm
-    v[0] = -1;
-    v[1] = 0.;
-    v[2] = 0.;
+  else {
 
-    x[0] = 0.0175;
-    x[1] = 0.0045;
-    x[2] = 0.;
-  }
-  else if(configuration == 2) {    //conf1 with z = 2.75 cm
-    v[0] = 0.;
-    v[1] = -1.;
-    v[2] = 0.;
+    if(configuration == 0) {    //conf1 with z = 1.75 cm
+      v[0] = 0.;
+      v[1] = -1.;
+      v[2] = 0.;
 
-    x[0] = -0.002065;
-    x[1] = -0.029932;
-    x[2] = 0.000169;
-  }
-  else if(configuration == 3) {    //conf2 with z = 2.75 cm
-    v[0] = -1;
-    v[1] = 0.;
-    v[2] = 0.;
+      x[0] = -0.002065;
+      x[1] = -0.019932;
+      x[2] = 0.000169;
+    }
+    else if(configuration == 1) {    //conf2 with z =1.75 cm
+      v[0] = -1;
+      v[1] = 0.;
+      v[2] = 0.;
 
-    x[0] = 0.0275;
-    x[1] = 0.0045;
-    x[2] = 0.;
-  }
+      x[0] = 0.0175;
+      x[1] = 0.0045;
+      x[2] = 0.;
+    }
+    else if(configuration == 2) {    //conf1 with z = 2.75 cm
+      v[0] = 0.;
+      v[1] = -1.;
+      v[2] = 0.;
 
-  else if(configuration == 4) {    //conf 3 with z = 1.75 cm
-    v[0] = 1;
-    v[1] = 0.;
-    v[2] = 0.;
+      x[0] = -0.002065;
+      x[1] = -0.029932;
+      x[2] = 0.000169;
+    }
+    else if(configuration == 3) {    //conf2 with z = 2.75 cm
+      v[0] = -1;
+      v[1] = 0.;
+      v[2] = 0.;
 
-    x[0] = -0.0285;
-    x[1] = -0.001;
-    x[2] = 0.;
-  }
+      x[0] = 0.0275;
+      x[1] = 0.0045;
+      x[2] = 0.;
+    }
 
-  else if(configuration == 5) {    //conf 3 with z = 2.75 cm
-    v[0] = 1;
-    v[1] = 0.;
-    v[2] = 0.;
+    else if(configuration == 4) {    //conf 3 with z = 1.75 cm
+      v[0] = 1;
+      v[1] = 0.;
+      v[2] = 0.;
 
-    x[0] = -0.0385;
-    x[1] = -0.001;
-    x[2] = 0.;
-  }
-  
+      x[0] = -0.0285;
+      x[1] = -0.001;
+      x[2] = 0.;
+    }
+
+    else if(configuration == 5) {    //conf 3 with z = 2.75 cm
+      v[0] = 1;
+      v[1] = 0.;
+      v[2] = 0.;
+
+      x[0] = -0.0385;
+      x[1] = -0.001;
+      x[2] = 0.;
+    }
+
   }
 
   //END
