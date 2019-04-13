@@ -54,8 +54,8 @@ double meanQoI = 0.; //initialization
 double varianceQoI = 0.; //initialization
 double stdDeviationQoI = 0.; //initialization
 double L = 0.1 ; // correlation length of the covariance function
-unsigned kOrder = 6; //for order tests
-unsigned numberOfSamples = pow (16, kOrder); //for MC sampling of the QoI
+unsigned kOrder = 2; //for order tests
+unsigned numberOfSamples = 1000; //for MC sampling of the QoI
 unsigned nxCoarseBox;
 double xMinCoarseBox = - 5.5; //-5.5 for Gaussian, -5. for SGM (average) with Gaussian KL, -3. for SGM (integral),  -1.5 for uniform, not KL: -0.6 for avg and int
 double xMaxCoarseBox = 5.5;  //5.5 for Gaussian, 3. for SGM (average) with Gaussian KL,  5.5 for SGM (integral), 1.5 for uniform, not KL: 0.6 for avg and 0.8 for int
@@ -67,10 +67,10 @@ double zMinCoarseBox = - 5.5;
 double zMaxCoarseBox = 5.5;
 
 unsigned kOrderFinest = 2;
-unsigned numberOfSamplesFinest = pow (16, kOrderFinest); //10^6 for spatial average, 10^7 for "integral" of the square, 10^7 for SGM with random variable (not KL)
-// unsigned nxCoarseBoxFinest = static_cast<unsigned> (floor (1. + 3.3 * log (numberOfSamplesFinest)));       //for spatial average
+unsigned numberOfSamplesFinest = 100; //10^6 for spatial average, 10^7 for "integral" of the square, 10^7 for SGM with random variable (not KL)
+unsigned nxCoarseBoxFinest = static_cast<unsigned> (floor (1. + 3.3 * log (numberOfSamplesFinest)));       //for spatial average
 // unsigned nxCoarseBoxFinest = static_cast<unsigned> ( floor ( 1. + 2. * log2 ( numberOfSamplesFinest ) ) ); //for integral of the square
-unsigned nxCoarseBoxFinest = static_cast<unsigned> ( pow ( 2, kOrderFinest ) );
+// unsigned nxCoarseBoxFinest = static_cast<unsigned> ( pow ( 2, kOrderFinest ) );
 unsigned nyCoarseBoxFinest = nxCoarseBoxFinest;
 unsigned nzCoarseBoxFinest = nxCoarseBoxFinest;
 
@@ -236,9 +236,9 @@ int main (int argc, char** argv) {
   MultiLevelMesh mlMshHisto;
   MultiLevelMesh mlMshHistoFinest;
 
-//     nxCoarseBox = static_cast<unsigned> ( floor ( 1. + 3.3 * log ( numberOfSamples ) ) );
+    nxCoarseBox = static_cast<unsigned> ( floor ( 1. + 3.3 * log ( numberOfSamples ) ) );
 //     nxCoarseBox = static_cast<unsigned> ( floor ( 1. + 2. * log2 ( numberOfSamples ) ) );
-  nxCoarseBox = static_cast<unsigned> (pow (2, kOrder));
+//   nxCoarseBox = static_cast<unsigned> (pow (2, kOrder));
   nyCoarseBox = nxCoarseBox;
   nzCoarseBox = nxCoarseBox;
 
