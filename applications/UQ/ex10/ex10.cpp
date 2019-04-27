@@ -54,8 +54,7 @@ double meanQoI = 0.; //initialization
 double varianceQoI = 0.; //initialization
 double stdDeviationQoI = 0.; //initialization
 double L = 0.1 ; // correlation length of the covariance function
-unsigned kOrder = 2; //for order tests
-unsigned numberOfSamples = 1000; //for MC sampling of the QoI
+unsigned kOrder = 6; //for order tests
 unsigned nxCoarseBox;
 double xMinCoarseBox = - 5.5; //-5.5 for Gaussian, -5. for SGM (average) with Gaussian KL, -3. for SGM (integral),  -1.5 for uniform, not KL: -0.6 for avg and int
 double xMaxCoarseBox = 5.5;  //5.5 for Gaussian, 3. for SGM (average) with Gaussian KL,  5.5 for SGM (integral), 1.5 for uniform, not KL: 0.6 for avg and 0.8 for int
@@ -66,21 +65,26 @@ unsigned nzCoarseBox;
 double zMinCoarseBox = - 5.5;
 double zMaxCoarseBox = 5.5;
 
-unsigned kOrderFinest = 2;
-unsigned numberOfSamplesFinest = 100; //10^6 for spatial average, 10^7 for "integral" of the square, 10^7 for SGM with random variable (not KL)
-unsigned nxCoarseBoxFinest = static_cast<unsigned> (floor (1. + 3.3 * log (numberOfSamplesFinest)));       //for spatial average
+unsigned numberOfSamples = static_cast<unsigned> (pow(16,kOrder) / 16.);
+
+unsigned kOrderFinest = 1;
+unsigned numberOfSamplesFinest = static_cast<unsigned> (pow(16,kOrderFinest) / 16.);
+
+// unsigned nxCoarseBoxFinest = static_cast<unsigned> ( pow ( 2, kOrderFinest ) ); for quadratic conv
+unsigned nxCoarseBoxFinest = static_cast<unsigned> (floor (2 * pow (numberOfSamplesFinest, 0.25))); // for 0.5 conv
+// unsigned nxCoarseBoxFinest = static_cast<unsigned> (floor (1. + 3.3 * log (numberOfSamplesFinest)));       //for spatial average
 // unsigned nxCoarseBoxFinest = static_cast<unsigned> ( floor ( 1. + 2. * log2 ( numberOfSamplesFinest ) ) ); //for integral of the square
-// unsigned nxCoarseBoxFinest = static_cast<unsigned> ( pow ( 2, kOrderFinest ) );
 unsigned nyCoarseBoxFinest = nxCoarseBoxFinest;
 unsigned nzCoarseBoxFinest = nxCoarseBoxFinest;
 
 bool histoFinest = false; //for SGM must be true
 bool histoErr = false; //true only if the histogram error is to be calculated, for analytic sampling
+bool takeTimes = false; //if true it does not compute the histogram
 double bLaplace = 1.5;
 double muLaplace = 0.;
 //END
 
-unsigned numberOfUniformLevels = 4; //refinement for the PDE mesh
+unsigned numberOfUniformLevels = 1; //refinement for the PDE mesh (must be 4 to run SGM results)
 
 int main (int argc, char** argv) {
 
@@ -236,17 +240,18 @@ int main (int argc, char** argv) {
   MultiLevelMesh mlMshHisto;
   MultiLevelMesh mlMshHistoFinest;
 
-    nxCoarseBox = static_cast<unsigned> ( floor ( 1. + 3.3 * log ( numberOfSamples ) ) );
+  nxCoarseBox  = static_cast<unsigned> (floor (2 * pow (numberOfSamples, 0.25))); //for 0.5 order conv
+//     nxCoarseBox = static_cast<unsigned> ( floor ( 1. + 3.3 * log ( numberOfSamples ) ) );
 //     nxCoarseBox = static_cast<unsigned> ( floor ( 1. + 2. * log2 ( numberOfSamples ) ) );
-//   nxCoarseBox = static_cast<unsigned> (pow (2, kOrder));
+//   nxCoarseBox = static_cast<unsigned> (pow (2, kOrder)); //for quadratic conv
   nyCoarseBox = nxCoarseBox;
   nzCoarseBox = nxCoarseBox;
 
-  mlMshHisto.GenerateCoarseBoxMesh ( nxCoarseBox, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh" ); //for 1D
+  mlMshHisto.GenerateCoarseBoxMesh (nxCoarseBox, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh");   //for 1D
 //   mlMshHisto.GenerateCoarseBoxMesh (nxCoarseBox, nyCoarseBox, 0, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, 0., 0., QUAD9, "seventh");   //for 2D
 //     mlMshHisto.GenerateCoarseBoxMesh ( nxCoarseBox, nyCoarseBox, nzCoarseBox, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, zMinCoarseBox, zMaxCoarseBox, HEX27, "seventh" ); //for 3D
 
-  mlMshHistoFinest.GenerateCoarseBoxMesh ( nxCoarseBoxFinest, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh" ); //for 1D
+  mlMshHistoFinest.GenerateCoarseBoxMesh (nxCoarseBoxFinest, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh");   //for 1D
 //   mlMshHistoFinest.GenerateCoarseBoxMesh (nxCoarseBoxFinest, nyCoarseBoxFinest, 0, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, 0., 0., QUAD9, "seventh");   //for 2D
 //     mlMshHistoFinest.GenerateCoarseBoxMesh ( nxCoarseBoxFinest, nyCoarseBoxFinest, nzCoarseBoxFinest, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, zMinCoarseBox, zMaxCoarseBox, HEX27, "seventh" ); //for 3D
 
@@ -280,7 +285,7 @@ int main (int argc, char** argv) {
 
 //   GetKDEIntegral(ml_probHisto);
 
-    GetAverageL2Error ( sgmQoIStandardized, mlSolHisto, mlSolHistoFinest );
+  GetAverageL2Error (sgmQoIStandardized, mlSolHisto, mlSolHistoFinest);
 
   GetL2Error (sgmQoIStandardized, mlSolHisto, mlSolHistoFinest, true);
 
@@ -1487,8 +1492,8 @@ void GetHistogramAndKDE (std::vector< std::vector <double > > & sgmQoIStandardiz
 
   unsigned level = 0.;
 
-  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel ( level );   // pointer to the mesh (level) object
-  Solution*                sol = mlSolHisto.GetSolutionLevel ( level );  // pointer to the solution (level) object
+  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel (level);     // pointer to the mesh (level) object
+  Solution*                sol = mlSolHisto.GetSolutionLevel (level);    // pointer to the solution (level) object
   const unsigned  dim = msh->GetDimension(); // get the domain dimension of the problem
   unsigned    iproc = msh->processor_id(); // get the process_id (for parallel computation)
 
@@ -1525,10 +1530,12 @@ void GetHistogramAndKDE (std::vector< std::vector <double > > & sgmQoIStandardiz
 
         if (sgmQoIStandardized[m][0] > xLeft && sgmQoIStandardized[m][0] <= xRight) {
 
-          //BEGIN write HISTO solution
-          double histoValue = 1. / measure;
-          sol->_Sol[solIndexHISTO]->add (iel, histoValue);
-          //END
+          if (!takeTimes) {
+            //BEGIN write HISTO solution
+            double histoValue = 1. / measure;
+            sol->_Sol[solIndexHISTO]->add (iel, histoValue);
+            //END
+          }
 
           //BEGIN write KDE solution
           short unsigned ielType = msh->GetElementType (iel);
@@ -1567,10 +1574,12 @@ void GetHistogramAndKDE (std::vector< std::vector <double > > & sgmQoIStandardiz
 
       if (iel >= sol->GetMesh()->_elementOffset[iproc]  &&  iel < sol->GetMesh()->_elementOffset[iproc + 1]) {
 
-        //BEGIN write HISTO solution
-        double histoValue = 1. / measure;
-        sol->_Sol[solIndexHISTO]->add (iel, histoValue);
-        //END
+        if (!takeTimes) {
+          //BEGIN write HISTO solution
+          double histoValue = 1. / measure;
+          sol->_Sol[solIndexHISTO]->add (iel, histoValue);
+          //END
+        }
 
         //BEGIN write KDE solution
         short unsigned ielType = msh->GetElementType (iel);
@@ -1631,8 +1640,8 @@ void GetHistogramAndKDE (std::vector< std::vector <double > > & sgmQoIStandardiz
 
 //BEGIN computation of histo finest
 
-    Mesh*                    mshFinest = mlSolHistoFinest._mlMesh->GetLevel ( level );   // pointer to the mesh (level) object
-    Solution*                solFinest = mlSolHistoFinest.GetSolutionLevel ( level );   // pointer to the solution (level) object
+    Mesh*                    mshFinest = mlSolHistoFinest._mlMesh->GetLevel (level);     // pointer to the mesh (level) object
+    Solution*                solFinest = mlSolHistoFinest.GetSolutionLevel (level);     // pointer to the solution (level) object
     unsigned    iprocFinest = mshFinest->processor_id(); // get the process_id (for parallel computation)
 
     sprintf (name, "HISTO_F");
@@ -1700,8 +1709,8 @@ void GetKDEIntegral (MultiLevelSolution& mlSolHisto) {
 
   unsigned level = 0.;
 
-  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel ( level );   // pointer to the mesh (level) object
-  Solution*                sol = mlSolHisto.GetSolutionLevel ( level );// pointer to the solution (level) object
+  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel (level);     // pointer to the mesh (level) object
+  Solution*                sol = mlSolHisto.GetSolutionLevel (level);  // pointer to the solution (level) object
   const unsigned  dim = msh->GetDimension(); // get the domain dimension of the problem
   unsigned    iproc = msh->processor_id(); // get the process_id (for parallel computation)
 
@@ -1782,13 +1791,13 @@ void GetAverageL2Error (std::vector< std::vector <double > > & sgmQoIStandardize
 
   unsigned level = 0.;
 
-  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel ( level );  // pointer to the mesh (level) object
-  Solution*                sol = mlSolHisto.GetSolutionLevel ( level );   // pointer to the solution (level) object
+  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel (level);    // pointer to the mesh (level) object
+  Solution*                sol = mlSolHisto.GetSolutionLevel (level);     // pointer to the solution (level) object
   const unsigned  dim = msh->GetDimension(); // get the domain dimension of the problem
   unsigned    iproc = msh->processor_id(); // get the process_id (for parallel computation)
 
-  Mesh*                    mshFinest = mlSolHistoFinest._mlMesh->GetLevel ( level );  // pointer to the mesh (level) object
-  Solution*                solFinest = mlSolHistoFinest.GetSolutionLevel ( level );   // pointer to the solution (level) object
+  Mesh*                    mshFinest = mlSolHistoFinest._mlMesh->GetLevel (level);    // pointer to the mesh (level) object
+  Solution*                solFinest = mlSolHistoFinest.GetSolutionLevel (level);     // pointer to the solution (level) object
   unsigned    iprocFinest = mshFinest->processor_id(); // get the process_id (for parallel computation)
 
   char name[10];
@@ -2010,11 +2019,11 @@ void GetAverageL2Error (std::vector< std::vector <double > > & sgmQoIStandardize
     MPI_Allreduce (&aL2ELocalHisto, &aL2EHisto, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   }
 
-  aL2E = sqrt (aL2E) / numberOfSamples;
+  aL2E = sqrt (aL2E / numberOfSamples);
 
-  aL2EHisto = sqrt (aL2EHisto) / numberOfSamples;
+  aL2EHisto = sqrt (aL2EHisto / numberOfSamples);
 
-  aL2EFinest = sqrt (aL2EFinest) / numberOfSamples;
+  aL2EFinest = sqrt (aL2EFinest / numberOfSamples);
 
   if (histoFinest == true) std::cout << "Average L2 Error Finest = " << std::setprecision (11) << aL2EFinest << std::endl;
 
@@ -2031,13 +2040,13 @@ void GetL2Error (std::vector< std::vector <double > > & sgmQoIStandardized, Mult
 
   unsigned level = 0.;
 
-  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel ( level );   // pointer to the mesh (level) object
-  Solution*                sol = mlSolHisto.GetSolutionLevel ( level );  // pointer to the solution (level) object
+  Mesh*                    msh = mlSolHisto._mlMesh->GetLevel (level);     // pointer to the mesh (level) object
+  Solution*                sol = mlSolHisto.GetSolutionLevel (level);    // pointer to the solution (level) object
   const unsigned  dim = msh->GetDimension(); // get the domain dimension of the problem
   unsigned    iproc = msh->processor_id(); // get the process_id (for parallel computation)
 
-  Mesh*                    mshFinest = mlSolHistoFinest._mlMesh->GetLevel ( level );   // pointer to the mesh (level) object
-  Solution*                solFinest = mlSolHistoFinest.GetSolutionLevel ( level );   // pointer to the solution (level) object
+  Mesh*                    mshFinest = mlSolHistoFinest._mlMesh->GetLevel (level);     // pointer to the mesh (level) object
+  Solution*                solFinest = mlSolHistoFinest.GetSolutionLevel (level);     // pointer to the solution (level) object
   unsigned    iprocFinest = mshFinest->processor_id(); // get the process_id (for parallel computation)
 
   char name[10];
