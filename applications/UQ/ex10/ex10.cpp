@@ -54,16 +54,16 @@ double meanQoI = 0.; //initialization
 double varianceQoI = 0.; //initialization
 double stdDeviationQoI = 0.; //initialization
 double L = 0.1 ; // correlation length of the covariance function
-unsigned kOrder = 5; //for order tests
+unsigned kOrder = 3; //for order tests
 unsigned nxCoarseBox;
-double xMinCoarseBox = - 3.5; //-5.5 for Gaussian, -5. for SGM (average) with Gaussian KL, -3. for SGM (integral),  -1.5 for uniform, not KL: -0.6 for avg and int
-double xMaxCoarseBox = 3.5;  //5.5 for Gaussian, 3. for SGM (average) with Gaussian KL,  5.5 for SGM (integral), 1.5 for uniform, not KL: 0.6 for avg and 0.8 for int
+double xMinCoarseBox = - 2.5; //-5.5 for Gaussian, -5. for SGM (average) with Gaussian KL, -3. for SGM (integral),  -1.5 for uniform, not KL: -0.6 for avg and int
+double xMaxCoarseBox = 4.5;  //5.5 for Gaussian, 3. for SGM (average) with Gaussian KL,  5.5 for SGM (integral), 1.5 for uniform, not KL: 0.6 for avg and 0.8 for int
 unsigned nyCoarseBox;
-double yMinCoarseBox = - 3.5;
-double yMaxCoarseBox = 3.5;
+double yMinCoarseBox = - 2.5;
+double yMaxCoarseBox = 4.5;
 unsigned nzCoarseBox;
-double zMinCoarseBox = - 5.;
-double zMaxCoarseBox = 3.;
+double zMinCoarseBox = - 2.5;
+double zMaxCoarseBox = 4.5;
 
 unsigned numberOfSamples = static_cast<unsigned> (pow (16, kOrder));
 // unsigned numberOfSamples = static_cast<unsigned> (pow (10, 7));
@@ -78,7 +78,7 @@ unsigned nxCoarseBoxFinest = static_cast<unsigned> (pow (2, kOrderFinest));
 unsigned nyCoarseBoxFinest = nxCoarseBoxFinest;
 unsigned nzCoarseBoxFinest = nxCoarseBoxFinest;
 
-bool histoFinest = true; //for SGM must be true
+bool histoFinest = false; //for SGM must be true
 bool histoErr = false; //true only if the histogram error is to be calculated, for analytic sampling
 bool takeTimes = true; //if true it does not compute the histogram
 double bLaplace = 1.5;
@@ -911,8 +911,8 @@ void GetCoefficientsForQuantityOfInterest (MultiLevelProblem& ml_prob, std::vect
           solu_gss += phi[i] * solu[j][i];
         }
 
-//          alphasTemp[j] += solu_gss * solu_gss * weight ; // this is similar to the integral of the square.
-        alphasTemp[j] +=  solu_gss *  weight / domainMeasure; // this is the spatial average over the domain.
+         alphasTemp[j] += solu_gss * solu_gss * weight ; // this is similar to the integral of the square.
+//         alphasTemp[j] +=  solu_gss *  weight / domainMeasure; // this is the spatial average over the domain.
       }
     } // end gauss point loop
 
