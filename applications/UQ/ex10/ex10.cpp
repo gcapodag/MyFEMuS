@@ -56,14 +56,22 @@ double stdDeviationQoI = 0.; //initialization
 double L = 0.1 ; // correlation length of the covariance function
 unsigned kOrder = 3; //for order tests
 unsigned nxCoarseBox;
-double xMinCoarseBox = - 2.5; //-5.5 for Gaussian, -5. for SGM (average) with Gaussian KL, -3. for SGM (integral),  -1.5 for uniform, not KL: -0.6 for avg and int
-double xMaxCoarseBox = 4.5;  //5.5 for Gaussian, 3. for SGM (average) with Gaussian KL,  5.5 for SGM (integral), 1.5 for uniform, not KL: 0.6 for avg and 0.8 for int
+double xMinCoarseBox =  - 5.; //-5.5 for Gaussian, -5. for SGM (average) with Gaussian KL, -3. for SGM (integral),  -1.5 for uniform, not KL: -0.6 for avg and int
+double xMaxCoarseBox = 3.;  //5.5 for Gaussian, 3. for SGM (average) with Gaussian KL,  5.5 for SGM (integral), 1.5 for uniform, not KL: 0.6 for avg and 0.8 for int
 unsigned nyCoarseBox;
-double yMinCoarseBox = - 2.5;
-double yMaxCoarseBox = 4.5;
+double yMinCoarseBox = - 5.;
+double yMaxCoarseBox = 3.;
 unsigned nzCoarseBox;
-double zMinCoarseBox = - 2.5;
-double zMaxCoarseBox = 4.5;
+double zMinCoarseBox = - 5.;
+double zMaxCoarseBox = 3.;
+
+double ymin = 0.;
+double ymax = 0.;
+
+double xSampleMin = 0.;
+double xSampleMax = 0.;
+double ySampleMin = 0.;
+double ySampleMax = 0.;
 
 unsigned numberOfSamples = static_cast<unsigned> (pow (16, kOrder));
 // unsigned numberOfSamples = static_cast<unsigned> (pow (10, 7));
@@ -72,7 +80,7 @@ unsigned kOrderFinest = 6;
 unsigned numberOfSamplesFinest = static_cast<unsigned> (pow (16, kOrderFinest));
 // unsigned numberOfSamplesFinest = static_cast<unsigned> (pow (10, 8));
 
-unsigned nxCoarseBoxFinest = static_cast<unsigned> (pow (2, kOrderFinest)); 
+unsigned nxCoarseBoxFinest = static_cast<unsigned> (pow (2, kOrderFinest));
 // unsigned nxCoarseBoxFinest = static_cast<unsigned> (floor (1. + 3.3 * log (numberOfSamplesFinest)));       //for spatial average
 // unsigned nxCoarseBoxFinest = static_cast<unsigned> ( floor ( 1. + 2. * log2 ( numberOfSamplesFinest ) ) ); //for integral of the square
 unsigned nyCoarseBoxFinest = nxCoarseBoxFinest;
@@ -247,12 +255,12 @@ int main (int argc, char** argv) {
   nyCoarseBox = nxCoarseBox;
   nzCoarseBox = nxCoarseBox;
 
-//   mlMshHisto.GenerateCoarseBoxMesh (nxCoarseBox, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh");   //for 1D
-  mlMshHisto.GenerateCoarseBoxMesh (nxCoarseBox, nyCoarseBox, 0, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, 0., 0., QUAD9, "seventh");   //for 2D
+  mlMshHisto.GenerateCoarseBoxMesh (nxCoarseBox, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh");   //for 1D
+//   mlMshHisto.GenerateCoarseBoxMesh (nxCoarseBox, nyCoarseBox, 0, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, 0., 0., QUAD9, "seventh");   //for 2D
 //     mlMshHisto.GenerateCoarseBoxMesh ( nxCoarseBox, nyCoarseBox, nzCoarseBox, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, zMinCoarseBox, zMaxCoarseBox, HEX27, "seventh" ); //for 3D
 
-//   mlMshHistoFinest.GenerateCoarseBoxMesh (nxCoarseBoxFinest, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh");   //for 1D
-  mlMshHistoFinest.GenerateCoarseBoxMesh (nxCoarseBoxFinest, nyCoarseBoxFinest, 0, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, 0., 0., QUAD9, "seventh");   //for 2D
+  mlMshHistoFinest.GenerateCoarseBoxMesh (nxCoarseBoxFinest, 0, 0, xMinCoarseBox, xMaxCoarseBox, 0., 0., 0., 0., EDGE3, "seventh");   //for 1D
+//   mlMshHistoFinest.GenerateCoarseBoxMesh (nxCoarseBoxFinest, nyCoarseBoxFinest, 0, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, 0., 0., QUAD9, "seventh");   //for 2D
 //     mlMshHistoFinest.GenerateCoarseBoxMesh ( nxCoarseBoxFinest, nyCoarseBoxFinest, nzCoarseBoxFinest, xMinCoarseBox, xMaxCoarseBox, yMinCoarseBox, yMaxCoarseBox, zMinCoarseBox, zMaxCoarseBox, HEX27, "seventh" ); //for 3D
 
   mlMshHisto.PrintInfo();
@@ -262,6 +270,9 @@ int main (int argc, char** argv) {
   std::vector< std::vector <double > > sgmQoIStandardized;
   std::vector< std::vector <double > > sgmQoIStandardizedFinest;
   GetQoIStandardizedSamples (alphas, sgmQoIStandardized, sgmQoIStandardizedFinest, dimCoarseBox);
+
+//   std::cout<< "ymin = " << ymin << " , " << "ymax = " << ymax << std::endl;
+std::cout<< "xSampleMin = " << xSampleMin << " , " << "xSampleMax = " << xSampleMax << " , " << "ySampleMin = " << ySampleMin << " , " << "ySampleMax = " << ySampleMax << std::endl; 
 
 
   MultiLevelSolution mlSolHisto (&mlMshHisto);
@@ -284,7 +295,7 @@ int main (int argc, char** argv) {
             << static_cast<double> ( (clock() - start_time)) / CLOCKS_PER_SEC << " s" << std::endl;
 
   std::cout << "h = " << (xMaxCoarseBox - xMinCoarseBox) / nxCoarseBox << std::endl;
-  
+
   std::cout << "M = " << numberOfSamples << std::endl;
 
 //   GetKDEIntegral(ml_probHisto);
@@ -911,8 +922,8 @@ void GetCoefficientsForQuantityOfInterest (MultiLevelProblem& ml_prob, std::vect
           solu_gss += phi[i] * solu[j][i];
         }
 
-         alphasTemp[j] += solu_gss * solu_gss * weight ; // this is similar to the integral of the square.
-//         alphasTemp[j] +=  solu_gss *  weight / domainMeasure; // this is the spatial average over the domain.
+//         alphasTemp[j] += solu_gss * solu_gss * weight ; // this is similar to the integral of the square.
+        alphasTemp[j] +=  solu_gss *  weight / domainMeasure; // this is the spatial average over the domain.
       }
     } // end gauss point loop
 
@@ -1352,6 +1363,12 @@ void GetQoIStandardizedSamples (std::vector< double >& alphas, std::vector< std:
   boost::variate_generator < boost::mt19937&,
         boost::normal_distribution<> > var_nor (rng, nd);
 
+  //FOR NON STD GAUSSIAN SAMPLING
+  boost::mt19937 rng3;
+  boost::normal_distribution<> nd3 (0., 2.);
+  boost::variate_generator < boost::mt19937&,
+        boost::normal_distribution<> > var_nor3 (rng3, nd3);
+
   //FOR UNIFORM DISTRIBUTION
   boost::mt19937 rng1; // I don't seed it on purpouse (it's not relevant)
   boost::random::uniform_real_distribution<> un (- 1., 1.);
@@ -1405,34 +1422,48 @@ void GetQoIStandardizedSamples (std::vector< double >& alphas, std::vector< std:
         sgmQoI += alphas[i] * MultivariatePolyHistogram[i]; //TODO with QoIs that are different from each other, alphas[i] will be alphas[idim][i]
       }
 
-            sgmQoIStandardized[m][idim] = ( sgmQoI - meanQoI ) / stdDeviationQoI; //TODO with QoIs that are different from each other, meanQoI and stdDeviationQoI will depend on idim
+      sgmQoIStandardized[m][idim] = (sgmQoI - meanQoI) / stdDeviationQoI;   //TODO with QoIs that are different from each other, meanQoI and stdDeviationQoI will depend on idim
+
+      std::cout <<  samplePoints[0] << " , " << samplePoints[1] << " , " << sgmQoIStandardized[m][idim] << std::endl;
+
+      if (samplePoints[0] > xSampleMax) xSampleMax = samplePoints[0];
+      if (samplePoints[0] < xSampleMin) xSampleMin = samplePoints[0];
+      if (samplePoints[1] > ySampleMax) ySampleMax = samplePoints[1];
+      if (samplePoints[1] < ySampleMin) ySampleMin = samplePoints[1];
 
 //       double normalSample = var_nor();
 //       sgmQoIStandardized[m][idim] = normalSample;
 
-//             double uniformSample = var_unif();
-//             sgmQoIStandardized[m][idim] = uniformSample;
+//       double uniformSample = var_unif();
+//       sgmQoIStandardized[m][idim] = uniformSample;
+// // //
+//       if (sgmQoIStandardized[m][0] > ymax) ymax = sgmQoIStandardized[m][0];
+//       if (sgmQoIStandardized[m][0] < ymin) ymin = sgmQoIStandardized[m][0];
 
       //mixed input
-//             if ( idim == 0 ) {
-//                 double U = var_unif1();
-//                 double signU = 0.;
-// 
-//                 if ( U < 0 ) {
-//                     signU = - 1.;
-//                 }
-// 
-//                 else if ( U > 0 ) {
-//                     signU = 1.;
-//                 }
-// 
-//                 sgmQoIStandardized[m][idim] = muLaplace - bLaplace * signU * log ( 1. - 2. * fabs ( U ) ) ;
-//             }
-// 
-//             else if ( idim == 1 ) {
-//                 double normalSample = var_nor();
-//                 sgmQoIStandardized[m][idim] = normalSample;
-//             }
+//       if (idim == 0) {
+//         double U = var_unif1();
+//         double signU = 0.;
+//
+//         if (U < 0) {
+//           signU = - 1.;
+//         }
+//
+//         else if (U > 0) {
+//           signU = 1.;
+//         }
+//
+//         sgmQoIStandardized[m][idim] = muLaplace - bLaplace * signU * log (1. - 2. * fabs (U)) ;
+
+
+//         double normalSample =  var_nor3();
+//         sgmQoIStandardized[m][idim] = normalSample;
+//       }
+
+//       else if (idim == 1) {
+//         double normalSample = var_nor();
+//         sgmQoIStandardized[m][idim] = normalSample;
+//       }
 
 
     }
@@ -1524,6 +1555,9 @@ void GetHistogramAndKDE (std::vector< std::vector <double > > & sgmQoIStandardiz
 
     if (dim == 1) {
 
+      unsigned firstDof = msh->_dofOffset[solTypeKDE][iproc];
+      unsigned lastDof = msh->_dofOffset[solTypeKDE][iproc + 1] - 1;
+
       for (int iel = sol->GetMesh()->_elementOffset[iproc]; iel < sol->GetMesh()->_elementOffset[iproc + 1]; iel ++) {
 
         unsigned  xLeftDof = sol->GetMesh()->GetSolutionDof (0, iel, 2);
@@ -1557,7 +1591,8 @@ void GetHistogramAndKDE (std::vector< std::vector <double > > & sgmQoIStandardiz
 
           for (unsigned inode = 0; inode < nDofsKDE; inode++) {
             unsigned globalDof = msh->GetSolutionDof (inode, iel, solTypeKDE);
-            double KDEvalue = phi[inode] / (numberOfSamples * dx);   //note: numberOfSamples * h is an approximation of the area under the histogram, aka the integral
+            double scalingFac = (globalDof == lastDof || globalDof == firstDof) ? 1. : 1.;
+            double KDEvalue = scalingFac * phi[inode] / (numberOfSamples * dx);   //note: numberOfSamples * h is an approximation of the area under the histogram, aka the integral
             sol->_Sol[solIndexKDE]->add (globalDof, KDEvalue);
           }
 
@@ -1873,13 +1908,16 @@ void GetAverageL2Error (std::vector< std::vector <double > > & sgmQoIStandardize
 
 //           double diffPHI = 0.5 * (1. + erf (5.5 / sqrt (2))) - 0.5 * (1. + erf (-5.5 / sqrt (2)));
 //           double stdGaussian = (exp (- sgmQoIStandardized[m][0] * sgmQoIStandardized[m][0] * 0.5) / sqrt (2 * PI)) / diffPHI;
-// 
+//
 //           aL2ELocal += (solKDESample - stdGaussian) * (solKDESample - stdGaussian);
 
+          double uniform = (fabs (sgmQoIStandardized[m][0]) <= 1.) ? 0.5 : 0. ;
 
-//                     double uniform = ( fabs ( sgmQoIStandardized[m][0] ) <= 1. ) ? 0.5 : 0. ;
-// 
-//                     aL2ELocal += ( solKDESample - uniform ) * ( solKDESample - uniform );
+          aL2ELocal += (solKDESample - uniform) * (solKDESample - uniform);
+
+//           double laplaceDist = (1. / (2. * bLaplace)) * exp (- fabs (sgmQoIStandardized[m][0] - muLaplace) / bLaplace) / (0.974438);
+//
+//           aL2ELocal += (solKDESample - laplaceDist) * (solKDESample - laplaceDist);
 
 //                     if ( histoErr ) aL2ELocalHisto += ( solHISTOSampleError - uniform ) * ( solHISTOSampleError - uniform );
 
@@ -1953,40 +1991,52 @@ void GetAverageL2Error (std::vector< std::vector <double > > & sgmQoIStandardize
         }
 
 //         double dotProduct = 0.;
-// 
+//
 //         for (unsigned jdim = 0; jdim < dim; jdim++) {
 //           dotProduct += sgmQoIStandardized[m][jdim] * sgmQoIStandardized[m][jdim];
 //         }
-// 
-// 
+//
+//
 //         double diffPHI = 0.5 * (1. + erf (5.5 / sqrt (2))) - 0.5 * (1. + erf (-5.5 / sqrt (2)));
 //         double stdGaussian = (exp (- dotProduct * 0.5) / (2 * PI)) / (diffPHI * diffPHI);
-// 
-// 
+//
+//
+//
 //         if (dim == 3) stdGaussian /= (sqrt (2 * PI) * diffPHI);
-// 
-// 
-// 
+// //
+// //
+// //
 //         aL2ELocal += (solKDESample - stdGaussian) * (solKDESample - stdGaussian);
 
 
-//                     double uniform = (dim == 2) ? 0.25 : 0.125;
-// 
-//                     for(unsigned kdim = 0; kdim < dim; kdim++) {
-//                         if(fabs(sgmQoIStandardized[m][kdim]) > 1.) uniform = 0.;
-//                     }
-// // //
-//                     aL2ELocal += (solKDESample - uniform) * (solKDESample - uniform);
+//         double diffPHI1 = 0.5 * (1. + erf (2.75 / sqrt (2))) - 0.5 * (1. + erf (-2.75 / sqrt (2)));
+//         double stdGaussian1 = (exp (- sgmQoIStandardized[m][0] * sgmQoIStandardized[m][0] * 0.125) / sqrt (8. * PI)) / diffPHI1;
+//
+//         double diffPHI2 = 0.5 * (1. + erf (5.5 / sqrt (2))) - 0.5 * (1. + erf (-5.5 / sqrt (2)));
+//         double stdGaussian2 = (exp (- sgmQoIStandardized[m][1] * sgmQoIStandardized[m][1] * 0.5) / sqrt (2. * PI)) / diffPHI2;
+//
+//         double jointPDF = stdGaussian1 * stdGaussian2;
+//
+//         aL2ELocal += (solKDESample - jointPDF) * (solKDESample - jointPDF);
 
-//                 double diffPHI = 0.5 * ( 1. + erf ( 5.5 / sqrt ( 2 ) ) ) - 0.5 * ( 1. + erf ( -5.5 / sqrt ( 2 ) ) );
-//                 double laplaceDist = ( 1. / ( 2. * bLaplace ) ) * exp ( - fabs ( sgmQoIStandardized[m][0] - muLaplace ) / bLaplace ) / ( 0.974438 );
-//                 double stdGaussian = ( exp ( - sgmQoIStandardized[m][1] * sgmQoIStandardized[m][1] * 0.5 ) / sqrt ( 2 * PI ) ) / diffPHI;
-// 
-//                 double jointPDF = laplaceDist * stdGaussian;
-// 
-//                 aL2ELocal += ( solKDESample - jointPDF ) * ( solKDESample - jointPDF );
 
-//                 if ( histoErr ) aL2ELocalHisto += ( solHISTOSampleError - uniform ) * ( solHISTOSampleError - uniform );
+        double uniform = (dim == 2) ? 0.25 : 0.125;
+
+        for (unsigned kdim = 0; kdim < dim; kdim++) {
+          if (fabs (sgmQoIStandardized[m][kdim]) > 1.) uniform = 0.;
+        }
+// //
+        aL2ELocal += (solKDESample - uniform) * (solKDESample - uniform);
+
+//         double diffPHI = 0.5 * (1. + erf (5.5 / sqrt (2))) - 0.5 * (1. + erf (-5.5 / sqrt (2)));
+//         double laplaceDist = (1. / (2. * bLaplace)) * exp (- fabs (sgmQoIStandardized[m][0] - muLaplace) / bLaplace) / (0.974438);
+//         double stdGaussian = (exp (- sgmQoIStandardized[m][1] * sgmQoIStandardized[m][1] * 0.5) / sqrt (2 * PI)) / diffPHI;
+//
+//         double jointPDF = laplaceDist * stdGaussian;
+//
+//         aL2ELocal += (solKDESample - jointPDF) * (solKDESample - jointPDF);
+
+//         if (histoErr) aL2ELocalHisto += (solHISTOSampleError - jointPDF) * (solHISTOSampleError - jointPDF);
 
         //END
 
