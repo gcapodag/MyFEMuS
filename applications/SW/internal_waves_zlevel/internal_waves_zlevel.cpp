@@ -12,6 +12,7 @@
  **/
 
 #include "FemusInit.hpp"
+#include "MultiLevelSolution.hpp"
 #include "MultiLevelProblem.hpp"
 #include "VTKWriter.hpp"
 #include "GMVWriter.hpp"
@@ -30,7 +31,8 @@ double rho1[20]={1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,100
 double ni_h = 0.01; 
 double ni_v = 0.0001;
 
-double dt = 300.; 
+double dt = 1.; 
+unsigned counter = 0.;
 
 const unsigned NumberOfLayers = 20; 
 
@@ -333,7 +335,7 @@ bool SetBoundaryCondition(const std::vector < double >& x, const char SolName[],
 }
 
 
-void ETD(MultiLevelProblem& ml_prob);
+void ETD(MultiLevelProblem& ml_prob, const double & numberOfTimeSteps);
 
 
 int main(int argc, char** args)
@@ -367,18 +369,18 @@ int main(int argc, char** args)
   for(unsigned i = 0; i < NumberOfLayers; i++) {
     char name[10];
     sprintf(name, "h%d", i);
-    mlSol.AddSolution(name, DISCONTINOUS_POLYNOMIAL, ZERO);
+    mlSol.AddSolution(name, DISCONTINUOUS_POLYNOMIAL, ZERO);
     sprintf(name, "v%d", i);
     mlSol.AddSolution(name, LAGRANGE, FIRST);
     sprintf(name, "T%d", i);
-    mlSol.AddSolution(name, DISCONTINOUS_POLYNOMIAL, ZERO);
+    mlSol.AddSolution(name, DISCONTINUOUS_POLYNOMIAL, ZERO);
     sprintf(name, "HT%d", i);
-    mlSol.AddSolution(name, DISCONTINOUS_POLYNOMIAL, ZERO);
+    mlSol.AddSolution(name, DISCONTINUOUS_POLYNOMIAL, ZERO);
   }
   
-  mlSol.AddSolution("b", DISCONTINOUS_POLYNOMIAL, ZERO, 1, false);
+  mlSol.AddSolution("b", DISCONTINUOUS_POLYNOMIAL, ZERO, 1, false);
 
-  mlSol.AddSolution("eta", DISCONTINOUS_POLYNOMIAL, ZERO, 1, false);
+  mlSol.AddSolution("eta", DISCONTINUOUS_POLYNOMIAL, ZERO, 1, false);
 
   mlSol.Initialize("All");
   
@@ -441,16 +443,17 @@ int main(int argc, char** args)
   //mlSol.GetWriter()->SetDebugOutput(true);
   mlSol.GetWriter()->Write(DEFAULT_OUTPUTDIR, "linear", print_vars, 0);
 
-  unsigned numberOfTimeSteps = 58000; //200days = 57600 with dt=300s
+  unsigned numberOfTimeSteps = 3601; //58000; //200days = 57600 with dt=300s
   for(unsigned i = 0; i < numberOfTimeSteps; i++) {    
-    ETD(ml_prob);
+    ETD(ml_prob, numberOfTimeSteps);
     mlSol.GetWriter()->Write(DEFAULT_OUTPUTDIR, "linear", print_vars, (i + 1)/1);
+    counter = i;
   }
   return 0;
 }
 
 
-void ETD(MultiLevelProblem& ml_prob)
+void ETD(MultiLevelProblem& ml_prob, const double & numberOfTimeSteps)
 {
 
   const unsigned& NLayers = NumberOfLayers;
@@ -851,7 +854,7 @@ void ETD(MultiLevelProblem& ml_prob)
       zMidp[k] = -bp + solhp[k]/2;
       for(unsigned i = k+1; i < NLayers; i++) {
         zMidm[k] += solhm[i];
-	zMidp[k] += solhp[i];
+	      zMidp[k] += solhp[i];
       }
       
       Pm[k] += rhokm * 9.81 * zMidm[k];
@@ -859,8 +862,8 @@ void ETD(MultiLevelProblem& ml_prob)
       //Pm[k] = - rhokm * 9.81 * bm; // bottom topography
       //Pp[k] = - rhokp * 9.81 * bp; // bottom topography
       for( unsigned j = 0; j < k; j++){
-	 adept::adouble rhojm = rho1[j] - beta * (solHTm[j]/solhm[j] - TRef);
-	 adept::adouble rhojp = rho1[j] - beta * (solHTp[j]/solhp[j] - TRef);
+	      adept::adouble rhojm = rho1[j] - beta * (solHTm[j]/solhm[j] - TRef);
+	      adept::adouble rhojp = rho1[j] - beta * (solHTp[j]/solhp[j] - TRef);
       //for( unsigned j = 0; j < NLayers; j++){
 	 //BEGIN Isopycnal Pressure
 	 //adept::adouble rhojm = (j <= k) ? (rho1[j] - beta * (solHTm[j]/solhm[j] - TRef)) : rhokm;
@@ -882,8 +885,8 @@ void ETD(MultiLevelProblem& ml_prob)
 // 	   rhojp = (rho1[j] - beta * solHTp[j]/solhp[j] - TRef) * rhokp/1024 * (rhokm+rhokp)/2;   
 // 	 }
 	 //END
-	 Pm[k] += rhojm * 9.81 * solhm[j];
-	 Pp[k] += rhojp * 9.81 * solhp[j];
+	      Pm[k] += rhojm * 9.81 * solhm[j];
+	      Pp[k] += rhojp * 9.81 * solhp[j];
 	 //std::cout<<"HHHHHHHHHHHHHHHHHHH "<<j<<std::endl;
 	 //std::cout<<"AAAAAAAAAAAAAAAAAAA "<<rhojm<<" , "<<rhojp<<std::endl;
       }
@@ -936,22 +939,22 @@ void ETD(MultiLevelProblem& ml_prob)
       adept::adouble ht = 0.;
       adept::adouble hb = 0.;
       if ( k > 0 ){
-	ht = (solhm[k-1] + solhm[k] + solhp[k-1] + solhp[k]) / 4.;
-	deltaZt = ( solv[k-1] - solv[k] ) / ht;
-	aResv[k] -= 0.5 * w[k] * deltaZt;
+        ht = (solhm[k-1] + solhm[k] + solhp[k-1] + solhp[k]) / 4.;
+	      deltaZt = ( solv[k-1] - solv[k] ) / ht;
+        aResv[k] -= 0.5 * w[k] * deltaZt;
       }
       else{
-	ht = 0.5 * (solhm[k] + solhp[k]);
-	deltaZt = 0.*( 0. - solv[k] ) / ht;
+	      ht = 0.5 * (solhm[k] + solhp[k]);
+	      deltaZt = 0.*( 0. - solv[k] ) / ht;
       }
       if (k < NLayers - 1) {
-	hb = (solhm[k] + solhm[k+1] + solhp[k] + solhp[k+1] ) / 4.;
-	deltaZb = (solv[k] - solv[k+1]) / hb;
-	aResv[k] -= 0.5 * w[k+1] * deltaZb; 
+	      hb = (solhm[k] + solhm[k+1] + solhp[k] + solhp[k+1] ) / 4.;
+	      deltaZb = (solv[k] - solv[k+1]) / hb;
+        aResv[k] -= 0.5 * w[k+1] * deltaZb; 
       }
       else{
-	hb = 0.5 * (solhm[k] + solhp[k]);
-	deltaZb = 0.*(solv[k] - 0.) / hb;
+	      hb = 0.5 * (solhm[k] + solhp[k]);
+	      deltaZb = 0.*(solv[k] - 0.) / hb;
       }
       
       aResv[k] += ni_h*(solvm[k] - solv[k])/(dxm * 0.5 * (dxm+dxp) ); // horizontal diffusion
@@ -1084,7 +1087,9 @@ void ETD(MultiLevelProblem& ml_prob)
       double valueH = (*sol->_Sol[solIndexh[k]])(i);
             
       double valueT = valueHT/valueH;
-    
+      std::cout.precision(14);
+      if(counter==numberOfTimeSteps-2) std::cout << valueT << std::endl;
+      
       sol->_Sol[solIndexT[k]]->set(i, valueT);
     }
     
