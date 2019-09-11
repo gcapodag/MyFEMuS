@@ -150,9 +150,9 @@ int main (int argc, char** argv) {
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
   mlMshFine.RefineMesh (numberOfUniformLevelsFine + numberOfSelectiveLevels, numberOfUniformLevelsFine , NULL);
 
-  mlMsh.EraseCoarseLevels (numberOfUniformLevels - 1);
+//   mlMsh.EraseCoarseLevels (numberOfUniformLevels - 1);
 
-  mlMshFine.EraseCoarseLevels (numberOfUniformLevelsFine - 1);
+//   mlMshFine.EraseCoarseLevels (numberOfUniformLevelsFine - 1);
 
   unsigned dim = mlMsh.GetDimension();
 
