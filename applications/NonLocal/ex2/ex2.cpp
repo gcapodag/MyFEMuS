@@ -86,7 +86,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
   return dirichlet;
 }
 
-unsigned numberOfUniformLevels = 2;
+unsigned numberOfUniformLevels = 3;
 unsigned numberOfUniformLevelsFine = 5;
 
 int main (int argc, char** argv) {
@@ -314,17 +314,17 @@ int main (int argc, char** argv) {
   //END compute errors
 
   // ******* Print solution *******
-  mlSol.SetWriter (VTK);
-  std::vector<std::string> print_vars;
-  print_vars.push_back ("All");
-  mlSol.GetWriter()->SetDebugOutput (true);
-  mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
-
-  mlSolFine.SetWriter (VTK);
-  std::vector<std::string> print_vars2;
-  print_vars2.push_back ("All");
-  mlSolFine.GetWriter()->SetDebugOutput (true);
-  mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
+//   mlSol.SetWriter (VTK);
+//   std::vector<std::string> print_vars;
+//   print_vars.push_back ("All");
+//   mlSol.GetWriter()->SetDebugOutput (true);
+//   mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
+// 
+//   mlSolFine.SetWriter (VTK);
+//   std::vector<std::string> print_vars2;
+//   print_vars2.push_back ("All");
+//   mlSolFine.GetWriter()->SetDebugOutput (true);
+//   mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
 
   std::cout << std::endl << " total CPU time : " << std::setw (11) << std::setprecision (6) << std::fixed
             << static_cast<double> ( (clock() - total_time)) / CLOCKS_PER_SEC << " s" << std::endl;
