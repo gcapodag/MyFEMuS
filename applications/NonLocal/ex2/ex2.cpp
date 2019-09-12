@@ -87,7 +87,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
 }
 
 unsigned numberOfUniformLevels = 1;
-unsigned numberOfUniformLevelsFine = 7;
+unsigned numberOfUniformLevelsFine = 6;
 
 int main (int argc, char** argv) {
 
@@ -290,7 +290,7 @@ int main (int argc, char** argv) {
   systemFine.SetLinearEquationSolverType ( FEMuS_DEFAULT );
 
 
-  systemFine.SetSparsityPatternMinimumSize (5000u);   //TODO tune
+  systemFine.SetSparsityPatternMinimumSize (8000u);   //TODO tune
 
   systemFine.init();
 
