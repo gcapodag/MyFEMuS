@@ -40,9 +40,7 @@ double InitalValueU (const std::vector < double >& x) {
 //   double u2 = a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0] ;
 
   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
-//   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
-  double u2 = u1;
-
+  double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
 
   value = (x[0] < 0.) ? u1 : u2;
 
@@ -69,8 +67,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
 //   double u2 = a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0] ;
 
   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
-//   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
-  double u2 = u1;
+  double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
 
   value = (x[0] < 0.) ? u1 : u2;
 
@@ -435,8 +432,7 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 //       double u2 = a2 + b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss;
 
       double u1 = (a1 + b1 * x_gss - 1. / (2. * kappa1) * x_gss * x_gss) * (1. + x_gss * x_gss) * cos (y_gss) ;
-//       double u2 = (a2 + b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss) * cos (x_gss) * cos (y_gss);
-      double u2 = u1;
+      double u2 = (a2 + b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss) * cos (x_gss) * cos (y_gss);
 
       soluExact_gss = (x_gss < 0.) ? u1 : u2;
 
