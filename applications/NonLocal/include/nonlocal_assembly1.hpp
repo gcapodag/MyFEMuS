@@ -339,18 +339,18 @@ void AssembleNonLocalSys (MultiLevelProblem& ml_prob) {
 
         bool coarseIntersectionTest = true;
 
-        for (unsigned k = 0; k < dim; k++) {
-          double min = 1.0e10;
-          min = (min < fabs (x1[k][k]   - x2[k][k])) ?    min :  fabs (x1[k][k]   - x2[k][k]);
-          min = (min < fabs (x1[k][k]   - x2[k][k + 1])) ?  min :  fabs (x1[k][k]   - x2[k][k + 1]);
-          min = (min < fabs (x1[k][k + 1] - x2[k][k])) ?    min :  fabs (x1[k][k + 1] - x2[k][k]);
-          min = (min < fabs (x1[k][k + 1] - x2[k][k + 1])) ?  min :  fabs (x1[k][k + 1] - x2[k][k + 1]);
-
-          if (min >= radius - 1.0e-10) {
-            coarseIntersectionTest = false;
-            break;
-          }
-        }
+//         for (unsigned k = 0; k < dim; k++) {
+//           double min = 1.0e10;
+//           min = (min < fabs (x1[k][k]   - x2[k][k])) ?    min :  fabs (x1[k][k]   - x2[k][k]);
+//           min = (min < fabs (x1[k][k]   - x2[k][k + 1])) ?  min :  fabs (x1[k][k]   - x2[k][k + 1]);
+//           min = (min < fabs (x1[k][k + 1] - x2[k][k])) ?    min :  fabs (x1[k][k + 1] - x2[k][k]);
+//           min = (min < fabs (x1[k][k + 1] - x2[k][k + 1])) ?  min :  fabs (x1[k][k + 1] - x2[k][k + 1]);
+// 
+//           if (min >= radius - 1.0e-10) {
+//             coarseIntersectionTest = false;
+//             break;
+//           }
+//         }
 
         if (coarseIntersectionTest) {
 
@@ -1007,18 +1007,18 @@ void AssembleNonLocalSysFine (MultiLevelProblem& ml_prob) {
 
         bool coarseIntersectionTest = true;
 
-        for (unsigned k = 0; k < dim; k++) {
-          double min = 1.0e10;
-          min = (min < fabs (x1[k][k]   - x2[k][k])) ?    min :  fabs (x1[k][k]   - x2[k][k]);
-          min = (min < fabs (x1[k][k]   - x2[k][k + 1])) ?  min :  fabs (x1[k][k]   - x2[k][k + 1]);
-          min = (min < fabs (x1[k][k + 1] - x2[k][k])) ?    min :  fabs (x1[k][k + 1] - x2[k][k]);
-          min = (min < fabs (x1[k][k + 1] - x2[k][k + 1])) ?  min :  fabs (x1[k][k + 1] - x2[k][k + 1]);
-
-          if (min >= radius - 1.0e-10) {
-            coarseIntersectionTest = false;
-            break;
-          }
-        }
+//         for (unsigned k = 0; k < dim; k++) {
+//           double min = 1.0e10;
+//           min = (min < fabs (x1[k][k]   - x2[k][k])) ?    min :  fabs (x1[k][k]   - x2[k][k]);
+//           min = (min < fabs (x1[k][k]   - x2[k][k + 1])) ?  min :  fabs (x1[k][k]   - x2[k][k + 1]);
+//           min = (min < fabs (x1[k][k + 1] - x2[k][k])) ?    min :  fabs (x1[k][k + 1] - x2[k][k]);
+//           min = (min < fabs (x1[k][k + 1] - x2[k][k + 1])) ?  min :  fabs (x1[k][k + 1] - x2[k][k + 1]);
+// 
+//           if (min >= radius - 1.0e-10) {
+//             coarseIntersectionTest = false;
+//             break;
+//           }
+//         }
 
         if (coarseIntersectionTest) {
 

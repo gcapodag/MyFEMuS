@@ -134,7 +134,7 @@ int main (int argc, char** argv) {
 //     mlMsh.ReadCoarseMesh ( "../input/martaTest4Coarser.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial1.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial2.neu", "second", scalingFactor );
-//   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
+  mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6.neu", "second", scalingFactor);
 //     mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7.neu", "second", scalingFactor);
@@ -145,7 +145,7 @@ int main (int argc, char** argv) {
 //      mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //      mlMsh.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
-    mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_connected.neu", "second", scalingFactor);
+//   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_connected.neu", "second", scalingFactor);
   mlMsh.RefineMesh (numberOfUniformLevels + numberOfSelectiveLevels, numberOfUniformLevels , NULL);
 
   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
@@ -159,6 +159,7 @@ int main (int argc, char** argv) {
 //      mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
+//   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_connected.neu", "second", scalingFactor);
   mlMshFine.RefineMesh (numberOfUniformLevelsFine + numberOfSelectiveLevels, numberOfUniformLevelsFine , NULL);
 
   mlMsh.EraseCoarseLevels (numberOfUniformLevels - 1);
@@ -322,7 +323,7 @@ int main (int argc, char** argv) {
 
   //BEGIN compute errors
   GetL2Norm (mlSol, mlSolFine);
-  GetL2NormLocalConnectedNonlocalFine(mlSol, mlSolFine);
+  GetL2NormLocalConnectedNonlocalFine (mlSol, mlSolFine);
   //END compute errors
 
   // ******* Print solution *******
@@ -557,68 +558,29 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 
   unsigned    iprocFine = mshFine->processor_id(); // get the process_id (for parallel computation)
 
-  for (int ielFine = solFine->GetMesh()->_elementOffset[iprocFine]; ielFine < solFine->GetMesh()->_elementOffset[iprocFine + 1]; ielFine ++) {
+  for (int kproc = 0; kproc < nprocs; kproc++) {
+    for (int ielCoarse = sol->GetMesh()->_elementOffset[kproc]; ielCoarse < sol->GetMesh()->_elementOffset[kproc + 1]; ielCoarse++) {
 
-    short unsigned ielFineGeom = mshFine->GetElementType (ielFine);
-    unsigned nDofFine  = mshFine->GetElementDofNumber (ielFine, soluType);
+      short unsigned ielGeomCoarse;
+      unsigned nDofCoarse;
 
-    vector < double >  soluNonLocFine (nDofFine);
-
-    std::vector < std::vector <double> > xFine (dim);
-
-    for (int k = 0; k < dim; k++) {
-      xFine[k].assign (nDofFine, 0.);
-    }
-
-    for (unsigned i = 0; i < nDofFine; i++) {
-      unsigned solDof = mshFine->GetSolutionDof (i, ielFine, soluType);
-      soluNonLocFine[i] = (*solFine->_Sol[soluIndexFine]) (solDof);
-      unsigned xDof  = mshFine->GetSolutionDof (i, ielFine, xType);
-      for (unsigned jdim = 0; jdim < dim; jdim++) {
-        xFine[jdim][i] = (*mshFine->_topology->_Sol[jdim]) (xDof);
-      }
-    }
-
-    vector <double> phi;  // local test function
-    vector <double> phi_x; // local test function first order partial derivatives
-    double weight; // gauss point weight
-
-    unsigned igNumberFine = mshFine->_finiteElement[ielFineGeom][soluType]->GetGaussPointNumber();
-//     unsigned igNumberFine = femQuadrature->GetGaussPointNumber();
-
-    // *** Gauss point loop ***
-    for (unsigned ig = 0; ig < igNumberFine; ig++) {
-      // *** get gauss point weight, test function and test function partial derivatives ***
-      mshFine->_finiteElement[ielFineGeom][soluType]->Jacobian (xFine, ig, weight, phi, phi_x);
-//       femQuadrature->Jacobian (xFine, ig, weight, phi, phi_x);
-
-      double soluNonLocCoarse_gss = 0.;
-      double soluNonLocFine_gss = 0.;
-      std::vector <double> x_gss_fine (dim, 0.);
-
-
-      for (unsigned i = 0; i < nDofFine; i++) {
-        soluNonLocFine_gss += phi[i] * soluNonLocFine[i];
-        for (unsigned jdim = 0; jdim < dim; jdim++) {
-          x_gss_fine[jdim] += phi[i] * xFine[jdim][i];
-        }
+      if (iproc == kproc) {
+        ielGeomCoarse = msh->GetElementType (ielCoarse);
+        nDofCoarse  = msh->GetElementDofNumber (ielCoarse, soluType);
       }
 
-      //BEGIN computation of the coarse solution at the fine Gauss point
+      MPI_Bcast (&ielGeomCoarse, 1, MPI_UNSIGNED_SHORT, kproc, MPI_COMM_WORLD);
+      MPI_Bcast (&nDofCoarse, 1, MPI_UNSIGNED, kproc, MPI_COMM_WORLD);
 
-      for (int ielCoarse = sol->GetMesh()->_elementOffset[iproc]; ielCoarse < sol->GetMesh()->_elementOffset[iproc + 1]; ielCoarse++) {
 
-        short unsigned ielGeomCoarse = msh->GetElementType (ielCoarse);
-        unsigned nDofCoarse  = msh->GetElementDofNumber (ielCoarse, soluType);
+      std::vector < std::vector <double> > xCoarse (dim);
+      vector < double >  soluNonLocCoarse (nDofCoarse);
 
-        vector < double >  soluNonLocCoarse (nDofCoarse);
+      for (int k = 0; k < dim; k++) {
+        xCoarse[k].resize (nDofCoarse);
+      }
 
-        std::vector < std::vector <double> > xCoarse (dim);
-
-        for (int k = 0; k < dim; k++) {
-          xCoarse[k].resize (nDofCoarse);
-        }
-
+      if (iproc == kproc) {
         for (unsigned jdof = 0; jdof < nDofCoarse; jdof++) {
           unsigned xDof  = msh->GetSolutionDof (jdof, ielCoarse, xType);
           unsigned solDof = msh->GetSolutionDof (jdof, ielCoarse, soluType);
@@ -628,71 +590,116 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
           }
         }
 
-
-        std::vector<std::vector<double>> xMinAndMax (dim);
-        xMinAndMax[0].assign (2, 0.);
-        xMinAndMax[1].assign (2, 0.);
-
-        xMinAndMax[0][0] = xCoarse[0][0];
-        xMinAndMax[0][1] = xCoarse[0][2];
-        xMinAndMax[1][0] = xCoarse[1][0];
-        xMinAndMax[1][1] = xCoarse[1][2];
-
-
-        for (unsigned i = 0; i < nDofCoarse; i++) {
-          if (xCoarse[0][i] < xMinAndMax[0][0]) xMinAndMax[0][0] = xCoarse[0][i];
-
-          if (xCoarse[0][i] > xMinAndMax[0][1]) xMinAndMax[0][1] = xCoarse[0][i];
-
-          if (xCoarse[1][i] < xMinAndMax[1][0]) xMinAndMax[1][0] = xCoarse[1][i];
-
-          if (xCoarse[1][i] > xMinAndMax[1][1]) xMinAndMax[1][1] = xCoarse[1][i];
-        }
-
-        unsigned fineGaussPointInCoarseElem = 0;
-
-        for (unsigned kdim = 0; kdim < dim; kdim++) {
-          if ( (x_gss_fine[kdim] > xMinAndMax[kdim][0] && x_gss_fine[kdim] < xMinAndMax[kdim][1]) || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][0]) < 1.e-10 || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][1]) < 1.e-10) {
-            fineGaussPointInCoarseElem++;
-          }
-        }
-
-        if (fineGaussPointInCoarseElem == dim) {
-
-          for (unsigned jdof = 0; jdof < nDofCoarse; jdof++) {
-            unsigned solDof = msh->GetSolutionDof (jdof, ielCoarse, soluType);
-            soluNonLocCoarse[jdof] = (*sol->_Sol[soluIndex]) (solDof);
-          }
-
-          std::vector<int> dofsTemp (nDofCoarse);
-          ReorderElement (dofsTemp, soluNonLocCoarse, xCoarse);
-
-          std::vector<double> x_gss_fine_Local (dim, 0.);
-          for (unsigned ii = 0; ii < dim; ii++) {
-            x_gss_fine_Local[ii] = - 1. + 2. * (x_gss_fine[ii] - xCoarse[ii][ii]) / (xCoarse[ii][ii + 1] - xCoarse[ii][ii]);
-          }
-
-          vector <double> phi2;  // local test function
-          vector <double> phi_x2; // local test function first order partial derivatives
-          double weight2; // gauss point weight
-          msh->_finiteElement[ielGeomCoarse][soluType]->Jacobian (xCoarse, x_gss_fine_Local, weight2, phi2, phi_x2);
-//           femQuadrature->Jacobian (xCoarse, x_gss_fine_Local, weight2, phi2, phi_x2);
-
-          for (unsigned jdof = 0; jdof < nDofCoarse; jdof++) {
-            soluNonLocCoarse_gss += soluNonLocCoarse[jdof] * phi2[jdof];
-          }
-
-          break;
-
-        }
+        std::vector<int> dofsTemp (nDofCoarse);
+        ReorderElement (dofsTemp, soluNonLocCoarse, xCoarse);
       }
 
-      //END computation of the fine solution at the coarse Gauss point
+      MPI_Bcast (&soluNonLocCoarse[0], nDofCoarse, MPI_DOUBLE, kproc, MPI_COMM_WORLD);
+
+      for (unsigned k = 0; k < dim; k++) {
+        MPI_Bcast (& xCoarse[k][0], nDofCoarse, MPI_DOUBLE, kproc, MPI_COMM_WORLD);
+      }
+
+      std::vector<std::vector<double>> xMinAndMax (dim);
+      xMinAndMax[0].assign (2, 0.);
+      xMinAndMax[1].assign (2, 0.);
+
+      xMinAndMax[0][0] = xCoarse[0][0];
+      xMinAndMax[0][1] = xCoarse[0][2];
+      xMinAndMax[1][0] = xCoarse[1][0];
+      xMinAndMax[1][1] = xCoarse[1][2];
 
 
-      error_NonLocCoarse_NonLocFine_norm2 += (soluNonLocCoarse_gss - soluNonLocFine_gss) * (soluNonLocCoarse_gss - soluNonLocFine_gss) * weight;
+      for (unsigned i = 0; i < nDofCoarse; i++) {
+        if (xCoarse[0][i] < xMinAndMax[0][0]) xMinAndMax[0][0] = xCoarse[0][i];
 
-      solNonlocalFine_norm2 += soluNonLocFine_gss * soluNonLocFine_gss * weight;
+        if (xCoarse[0][i] > xMinAndMax[0][1]) xMinAndMax[0][1] = xCoarse[0][i];
+
+        if (xCoarse[1][i] < xMinAndMax[1][0]) xMinAndMax[1][0] = xCoarse[1][i];
+
+        if (xCoarse[1][i] > xMinAndMax[1][1]) xMinAndMax[1][1] = xCoarse[1][i];
+      }
+
+      for (int ielFine = solFine->GetMesh()->_elementOffset[iprocFine]; ielFine < solFine->GetMesh()->_elementOffset[iprocFine + 1]; ielFine ++) {
+
+        short unsigned ielFineGeom = mshFine->GetElementType (ielFine);
+        unsigned nDofFine  = mshFine->GetElementDofNumber (ielFine, soluType);
+
+        vector < double >  soluNonLocFine (nDofFine);
+
+        std::vector < std::vector <double> > xFine (dim);
+
+        for (int k = 0; k < dim; k++) {
+          xFine[k].assign (nDofFine, 0.);
+        }
+
+        for (unsigned i = 0; i < nDofFine; i++) {
+          unsigned solDof = mshFine->GetSolutionDof (i, ielFine, soluType);
+          soluNonLocFine[i] = (*solFine->_Sol[soluIndexFine]) (solDof);
+          unsigned xDof  = mshFine->GetSolutionDof (i, ielFine, xType);
+          for (unsigned jdim = 0; jdim < dim; jdim++) {
+            xFine[jdim][i] = (*mshFine->_topology->_Sol[jdim]) (xDof);
+          }
+        }
+
+        vector <double> phi;  // local test function
+        vector <double> phi_x; // local test function first order partial derivatives
+        double weight; // gauss point weight
+
+        unsigned igNumberFine = mshFine->_finiteElement[ielFineGeom][soluType]->GetGaussPointNumber();
+//     unsigned igNumberFine = femQuadrature->GetGaussPointNumber();
+
+        // *** Gauss point loop ***
+        for (unsigned ig = 0; ig < igNumberFine; ig++) {
+          // *** get gauss point weight, test function and test function partial derivatives ***
+          mshFine->_finiteElement[ielFineGeom][soluType]->Jacobian (xFine, ig, weight, phi, phi_x);
+//       femQuadrature->Jacobian (xFine, ig, weight, phi, phi_x);
+
+          double soluNonLocCoarse_gss = 0.;
+          double soluNonLocFine_gss = 0.;
+          std::vector <double> x_gss_fine (dim, 0.);
+
+
+          for (unsigned i = 0; i < nDofFine; i++) {
+            soluNonLocFine_gss += phi[i] * soluNonLocFine[i];
+            for (unsigned jdim = 0; jdim < dim; jdim++) {
+              x_gss_fine[jdim] += phi[i] * xFine[jdim][i];
+            }
+          }
+
+          unsigned fineGaussPointInLocalMeshElem = 0;
+
+          for (unsigned kdim = 0; kdim < dim; kdim++) {
+            if ( (x_gss_fine[kdim] > xMinAndMax[kdim][0] && x_gss_fine[kdim] < xMinAndMax[kdim][1]) || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][0]) < 1.e-10 || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][1]) < 1.e-10) {
+              fineGaussPointInLocalMeshElem++;
+            }
+          }
+
+          if (fineGaussPointInLocalMeshElem == dim) {
+
+
+            std::vector<double> x_gss_fine_Local (dim, 0.);
+            for (unsigned ii = 0; ii < dim; ii++) {
+              x_gss_fine_Local[ii] = - 1. + 2. * (x_gss_fine[ii] - xCoarse[ii][ii]) / (xCoarse[ii][ii + 1] - xCoarse[ii][ii]);
+            }
+
+            vector <double> phi2;  // local test function
+            vector <double> phi_x2; // local test function first order partial derivatives
+            double weight2; // gauss point weight
+            msh->_finiteElement[ielGeomCoarse][soluType]->Jacobian (xCoarse, x_gss_fine_Local, weight2, phi2, phi_x2);
+//           femQuadrature->Jacobian (xCoarse, x_gss_fine_Local, weight2, phi2, phi_x2);
+
+            for (unsigned jdof = 0; jdof < nDofCoarse; jdof++) {
+              soluNonLocCoarse_gss += soluNonLocCoarse[jdof] * phi2[jdof];
+            }
+
+            error_NonLocCoarse_NonLocFine_norm2 += (soluNonLocCoarse_gss - soluNonLocFine_gss) * (soluNonLocCoarse_gss - soluNonLocFine_gss) * weight;
+
+            solNonlocalFine_norm2 += soluNonLocFine_gss * soluNonLocFine_gss * weight;
+
+          }
+        }
+      }
 
     }
 
@@ -747,140 +754,146 @@ void GetL2NormLocalConnectedNonlocalFine (MultiLevelSolution & mlSol, MultiLevel
 
   unsigned    iprocFine = mshFine->processor_id(); // get the process_id (for parallel computation)
 
-  for (int ielFine = solFine->GetMesh()->_elementOffset[iprocFine]; ielFine < solFine->GetMesh()->_elementOffset[iprocFine + 1]; ielFine ++) {
+  for (int kproc = 0; kproc < nprocs; kproc++) {
+    for (int ielLocal = sol->GetMesh()->_elementOffset[kproc]; ielLocal < sol->GetMesh()->_elementOffset[kproc + 1]; ielLocal++) {
 
-    short unsigned ielFineGeom = mshFine->GetElementType (ielFine);
-    unsigned nDofFine  = mshFine->GetElementDofNumber (ielFine, soluType);
+      short unsigned ielGeomLocal;
+      unsigned nDofLocal;
 
-    vector < double >  soluNonLocFine (nDofFine);
-
-    std::vector < std::vector <double> > xFine (dim);
-
-    for (int k = 0; k < dim; k++) {
-      xFine[k].assign (nDofFine, 0.);
-    }
-
-    for (unsigned i = 0; i < nDofFine; i++) {
-      unsigned solDof = mshFine->GetSolutionDof (i, ielFine, soluType);
-      soluNonLocFine[i] = (*solFine->_Sol[soluIndexFine]) (solDof);
-      unsigned xDof  = mshFine->GetSolutionDof (i, ielFine, xType);
-      for (unsigned jdim = 0; jdim < dim; jdim++) {
-        xFine[jdim][i] = (*mshFine->_topology->_Sol[jdim]) (xDof);
-      }
-    }
-
-    vector <double> phi;  // local test function
-    vector <double> phi_x; // local test function first order partial derivatives
-    double weight; // gauss point weight
-
-    unsigned igNumberFine = mshFine->_finiteElement[ielFineGeom][soluType]->GetGaussPointNumber();
-//     unsigned igNumberFine = femQuadrature->GetGaussPointNumber();
-
-    // *** Gauss point loop ***
-    for (unsigned ig = 0; ig < igNumberFine; ig++) {
-      // *** get gauss point weight, test function and test function partial derivatives ***
-      mshFine->_finiteElement[ielFineGeom][soluType]->Jacobian (xFine, ig, weight, phi, phi_x);
-//       femQuadrature->Jacobian (xFine, ig, weight, phi, phi_x);
-
-      double soluLoc_gss = 0.;
-      double soluNonLocFine_gss = 0.;
-      std::vector <double> x_gss_fine (dim, 0.);
-
-
-      for (unsigned i = 0; i < nDofFine; i++) {
-        soluNonLocFine_gss += phi[i] * soluNonLocFine[i];
-        for (unsigned jdim = 0; jdim < dim; jdim++) {
-          x_gss_fine[jdim] += phi[i] * xFine[jdim][i];
-        }
+      if (iproc == kproc) {
+        ielGeomLocal = msh->GetElementType (ielLocal);
+        nDofLocal  = msh->GetElementDofNumber (ielLocal, soluType);
       }
 
-      //BEGIN computation of the local solution at the fine Gauss point
+      MPI_Bcast (&ielGeomLocal, 1, MPI_UNSIGNED_SHORT, kproc, MPI_COMM_WORLD);
+      MPI_Bcast (&nDofLocal, 1, MPI_UNSIGNED, kproc, MPI_COMM_WORLD);
 
-      for (int ielLocal = sol->GetMesh()->_elementOffset[iproc]; ielLocal < sol->GetMesh()->_elementOffset[iproc + 1]; ielLocal++) {
 
-        short unsigned ielGeomLocal = msh->GetElementType (ielLocal);
-        unsigned nDofLocal  = msh->GetElementDofNumber (ielLocal, soluType);
+      std::vector < std::vector <double> > xLocal (dim);
+      vector < double >  soluLocLocal (nDofLocal);
 
-        vector < double >  soluLocLocal (nDofLocal);
+      for (int k = 0; k < dim; k++) {
+        xLocal[k].resize (nDofLocal);
+      }
 
-        std::vector < std::vector <double> > xLocal (dim);
-
-        for (int k = 0; k < dim; k++) {
-          xLocal[k].resize (nDofLocal);
-        }
-
+      if (iproc == kproc) {
         for (unsigned jdof = 0; jdof < nDofLocal; jdof++) {
           unsigned xDof  = msh->GetSolutionDof (jdof, ielLocal, xType);
           unsigned solDof = msh->GetSolutionDof (jdof, ielLocal, soluType);
+          soluLocLocal[jdof] = (*sol->_Sol[soluIndexLocal]) (solDof);
           for (unsigned k = 0; k < dim; k++) {
             xLocal[k][jdof] = (*sol->GetMesh()->_topology->_Sol[k]) (xDof);
           }
         }
 
-
-        std::vector<std::vector<double>> xMinAndMax (dim);
-        xMinAndMax[0].assign (2, 0.);
-        xMinAndMax[1].assign (2, 0.);
-
-        xMinAndMax[0][0] = xLocal[0][0];
-        xMinAndMax[0][1] = xLocal[0][2];
-        xMinAndMax[1][0] = xLocal[1][0];
-        xMinAndMax[1][1] = xLocal[1][2];
-
-
-        for (unsigned i = 0; i < nDofLocal; i++) {
-          if (xLocal[0][i] < xMinAndMax[0][0]) xMinAndMax[0][0] = xLocal[0][i];
-
-          if (xLocal[0][i] > xMinAndMax[0][1]) xMinAndMax[0][1] = xLocal[0][i];
-
-          if (xLocal[1][i] < xMinAndMax[1][0]) xMinAndMax[1][0] = xLocal[1][i];
-
-          if (xLocal[1][i] > xMinAndMax[1][1]) xMinAndMax[1][1] = xLocal[1][i];
-        }
-
-        unsigned fineGaussPointInLocalMeshElem = 0;
-
-        for (unsigned kdim = 0; kdim < dim; kdim++) {
-          if ( (x_gss_fine[kdim] > xMinAndMax[kdim][0] && x_gss_fine[kdim] < xMinAndMax[kdim][1]) || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][0]) < 1.e-10 || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][1]) < 1.e-10) {
-            fineGaussPointInLocalMeshElem++;
-          }
-        }
-
-        if (fineGaussPointInLocalMeshElem == dim) {
-
-
-          for (unsigned jdof = 0; jdof < nDofLocal; jdof++) {
-            unsigned solDof = msh->GetSolutionDof (jdof, ielLocal, soluType);
-            soluLocLocal[jdof] = (*sol->_Sol[soluIndexLocal]) (solDof);
-          }
-
-          std::vector<int> dofsTemp (nDofLocal);
-          ReorderElement (dofsTemp, soluLocLocal, xLocal);
-
-          std::vector<double> x_gss_fine_Local (dim, 0.);
-          for (unsigned ii = 0; ii < dim; ii++) {
-            x_gss_fine_Local[ii] = - 1. + 2. * (x_gss_fine[ii] - xLocal[ii][ii]) / (xLocal[ii][ii + 1] - xLocal[ii][ii]);
-          }
-
-          vector <double> phi2;  // local test function
-          vector <double> phi_x2; // local test function first order partial derivatives
-          double weight2; // gauss point weight
-          msh->_finiteElement[ielGeomLocal][soluType]->Jacobian (xLocal, x_gss_fine_Local, weight2, phi2, phi_x2);
-//           femQuadrature->Jacobian (xLocal, x_gss_fine_Local, weight2, phi2, phi_x2);
-
-          for (unsigned jdof = 0; jdof < nDofLocal; jdof++) {
-            soluLoc_gss += soluLocLocal[jdof] * phi2[jdof];
-          }
-
-          break;
-
-        }
+        std::vector<int> dofsTemp (nDofLocal);
+        ReorderElement (dofsTemp, soluLocLocal, xLocal);
       }
 
-      //END computation of the fine solution at the coarse Gauss point
+      MPI_Bcast (&soluLocLocal[0], nDofLocal, MPI_DOUBLE, kproc, MPI_COMM_WORLD);
+
+      for (unsigned k = 0; k < dim; k++) {
+        MPI_Bcast (& xLocal[k][0], nDofLocal, MPI_DOUBLE, kproc, MPI_COMM_WORLD);
+      }
+
+      std::vector<std::vector<double>> xMinAndMax (dim);
+      xMinAndMax[0].assign (2, 0.);
+      xMinAndMax[1].assign (2, 0.);
+
+      xMinAndMax[0][0] = xLocal[0][0];
+      xMinAndMax[0][1] = xLocal[0][2];
+      xMinAndMax[1][0] = xLocal[1][0];
+      xMinAndMax[1][1] = xLocal[1][2];
 
 
-      error_Loc_NonLocFine_norm2 += (soluLoc_gss - soluNonLocFine_gss) * (soluLoc_gss - soluNonLocFine_gss) * weight;
+      for (unsigned i = 0; i < nDofLocal; i++) {
+        if (xLocal[0][i] < xMinAndMax[0][0]) xMinAndMax[0][0] = xLocal[0][i];
+
+        if (xLocal[0][i] > xMinAndMax[0][1]) xMinAndMax[0][1] = xLocal[0][i];
+
+        if (xLocal[1][i] < xMinAndMax[1][0]) xMinAndMax[1][0] = xLocal[1][i];
+
+        if (xLocal[1][i] > xMinAndMax[1][1]) xMinAndMax[1][1] = xLocal[1][i];
+      }
+
+      for (int ielFine = solFine->GetMesh()->_elementOffset[iprocFine]; ielFine < solFine->GetMesh()->_elementOffset[iprocFine + 1]; ielFine ++) {
+
+        short unsigned ielFineGeom = mshFine->GetElementType (ielFine);
+        unsigned nDofFine  = mshFine->GetElementDofNumber (ielFine, soluType);
+
+        vector < double >  soluNonLocFine (nDofFine);
+
+        std::vector < std::vector <double> > xFine (dim);
+
+        for (int k = 0; k < dim; k++) {
+          xFine[k].assign (nDofFine, 0.);
+        }
+
+        for (unsigned i = 0; i < nDofFine; i++) {
+          unsigned solDof = mshFine->GetSolutionDof (i, ielFine, soluType);
+          soluNonLocFine[i] = (*solFine->_Sol[soluIndexFine]) (solDof);
+          unsigned xDof  = mshFine->GetSolutionDof (i, ielFine, xType);
+          for (unsigned jdim = 0; jdim < dim; jdim++) {
+            xFine[jdim][i] = (*mshFine->_topology->_Sol[jdim]) (xDof);
+          }
+        }
+
+        vector <double> phi;  // local test function
+        vector <double> phi_x; // local test function first order partial derivatives
+        double weight; // gauss point weight
+
+        unsigned igNumberFine = mshFine->_finiteElement[ielFineGeom][soluType]->GetGaussPointNumber();
+//     unsigned igNumberFine = femQuadrature->GetGaussPointNumber();
+
+        // *** Gauss point loop ***
+        for (unsigned ig = 0; ig < igNumberFine; ig++) {
+          // *** get gauss point weight, test function and test function partial derivatives ***
+          mshFine->_finiteElement[ielFineGeom][soluType]->Jacobian (xFine, ig, weight, phi, phi_x);
+//       femQuadrature->Jacobian (xFine, ig, weight, phi, phi_x);
+
+          double soluLoc_gss = 0.;
+          double soluNonLocFine_gss = 0.;
+          std::vector <double> x_gss_fine (dim, 0.);
+
+
+          for (unsigned i = 0; i < nDofFine; i++) {
+            soluNonLocFine_gss += phi[i] * soluNonLocFine[i];
+            for (unsigned jdim = 0; jdim < dim; jdim++) {
+              x_gss_fine[jdim] += phi[i] * xFine[jdim][i];
+            }
+          }
+
+          unsigned fineGaussPointInLocalMeshElem = 0;
+
+          for (unsigned kdim = 0; kdim < dim; kdim++) {
+            if ( (x_gss_fine[kdim] > xMinAndMax[kdim][0] && x_gss_fine[kdim] < xMinAndMax[kdim][1]) || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][0]) < 1.e-10 || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][1]) < 1.e-10) {
+              fineGaussPointInLocalMeshElem++;
+            }
+          }
+
+          if (fineGaussPointInLocalMeshElem == dim) {
+
+
+            std::vector<double> x_gss_fine_Local (dim, 0.);
+            for (unsigned ii = 0; ii < dim; ii++) {
+              x_gss_fine_Local[ii] = - 1. + 2. * (x_gss_fine[ii] - xLocal[ii][ii]) / (xLocal[ii][ii + 1] - xLocal[ii][ii]);
+            }
+
+            vector <double> phi2;  // local test function
+            vector <double> phi_x2; // local test function first order partial derivatives
+            double weight2; // gauss point weight
+            msh->_finiteElement[ielGeomLocal][soluType]->Jacobian (xLocal, x_gss_fine_Local, weight2, phi2, phi_x2);
+//           femQuadrature->Jacobian (xLocal, x_gss_fine_Local, weight2, phi2, phi_x2);
+
+            for (unsigned jdof = 0; jdof < nDofLocal; jdof++) {
+              soluLoc_gss += soluLocLocal[jdof] * phi2[jdof];
+            }
+
+            error_Loc_NonLocFine_norm2 += (soluLoc_gss - soluNonLocFine_gss) * (soluLoc_gss - soluNonLocFine_gss) * weight;
+
+          }
+        }
+      }
 
     }
 
