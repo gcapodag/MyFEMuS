@@ -94,7 +94,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
   return dirichlet;
 }
 
-unsigned numberOfUniformLevels = 5;
+unsigned numberOfUniformLevels = 1;
 unsigned numberOfUniformLevelsFine = 6;
 
 int main (int argc, char** argv) {
@@ -339,8 +339,8 @@ int main (int argc, char** argv) {
 //   mlSolFine.GetWriter()->SetDebugOutput (true);
 //   mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
 // 
-//   std::cout << std::endl << " total CPU time : " << std::setw (11) << std::setprecision (6) << std::fixed
-//             << static_cast<double> ( (clock() - total_time)) / CLOCKS_PER_SEC << " s" << std::endl;
+  std::cout << std::endl << " total CPU time : " << std::setw (11) << std::setprecision (6) << std::fixed
+            << static_cast<double> ( (clock() - total_time)) / CLOCKS_PER_SEC << " s" << std::endl;
 
   return 0;
 
