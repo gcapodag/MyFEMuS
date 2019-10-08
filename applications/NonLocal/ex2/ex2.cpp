@@ -41,8 +41,8 @@ double InitalValueU (const std::vector < double >& x) {
 
 //   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
 //   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
-  
-    double u1 = x[0] * x[0] * x[1] + cos(x[0]);
+
+  double u1 = x[0] * x[0] * x[1] + cos (x[0]);
   double u2 = u1;
 
   value = (x[0] < 0.) ? u1 : u2;
@@ -52,6 +52,8 @@ double InitalValueU (const std::vector < double >& x) {
 }
 
 void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine);
+
+void GetL2NormLocalConnectedNonlocalFine (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine);
 
 bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[], double& value, const int facename, const double time) {
 
@@ -71,8 +73,8 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
 
 //   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
 //   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
-  
-    double u1 = x[0] * x[0] * x[1] + cos(x[0]);
+
+  double u1 = x[0] * x[0] * x[1] + cos (x[0]);
   double u2 = u1;
 
   value = (x[0] < 0.) ? u1 : u2;
@@ -92,7 +94,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
   return dirichlet;
 }
 
-unsigned numberOfUniformLevels = 5;
+unsigned numberOfUniformLevels = 1;
 unsigned numberOfUniformLevelsFine = 1;
 
 int main (int argc, char** argv) {
@@ -132,7 +134,7 @@ int main (int argc, char** argv) {
 //     mlMsh.ReadCoarseMesh ( "../input/martaTest4Coarser.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial1.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial2.neu", "second", scalingFactor );
-  mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
+//   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6.neu", "second", scalingFactor);
 //     mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7.neu", "second", scalingFactor);
@@ -143,6 +145,7 @@ int main (int argc, char** argv) {
 //      mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //      mlMsh.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
+    mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_connected.neu", "second", scalingFactor);
   mlMsh.RefineMesh (numberOfUniformLevels + numberOfSelectiveLevels, numberOfUniformLevels , NULL);
 
   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
@@ -222,7 +225,7 @@ int main (int argc, char** argv) {
   system.SetNumberPostSmoothingStep (1);
 
   // ******* Set Preconditioner *******
-  system.SetLinearEquationSolverType ( FEMuS_DEFAULT );
+  system.SetLinearEquationSolverType (FEMuS_DEFAULT);
 
   system.SetSparsityPatternMinimumSize (5000u);   //TODO tune
 
@@ -257,7 +260,7 @@ int main (int argc, char** argv) {
 
   system2.SetAbsoluteLinearConvergenceTolerance (1.e-50);
 
-  system2.SetLinearEquationSolverType ( FEMuS_DEFAULT );
+  system2.SetLinearEquationSolverType (FEMuS_DEFAULT);
 
   system2.init();
 
@@ -295,7 +298,7 @@ int main (int argc, char** argv) {
   systemFine.SetNumberPostSmoothingStep (1);
 
   // ******* Set Preconditioner *******
-  systemFine.SetLinearEquationSolverType ( FEMuS_DEFAULT );
+  systemFine.SetLinearEquationSolverType (FEMuS_DEFAULT);
 
 
   systemFine.SetSparsityPatternMinimumSize (5000u);   //TODO tune
@@ -312,27 +315,28 @@ int main (int argc, char** argv) {
 
 // ******* Solution *******
 
-//   systemFine.MGsolve(); //TODO
+  systemFine.MGsolve(); //TODO
 
   //END assemble and solve nonlocal problem
 
 
   //BEGIN compute errors
   GetL2Norm (mlSol, mlSolFine);
+  GetL2NormLocalConnectedNonlocalFine(mlSol, mlSolFine);
   //END compute errors
 
   // ******* Print solution *******
-//   mlSol.SetWriter (VTK);
-//   std::vector<std::string> print_vars;
-//   print_vars.push_back ("All");
-//   mlSol.GetWriter()->SetDebugOutput (true);
-//   mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
-// 
-//   mlSolFine.SetWriter (VTK);
-//   std::vector<std::string> print_vars2;
-//   print_vars2.push_back ("All");
-//   mlSolFine.GetWriter()->SetDebugOutput (true);
-//   mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
+  mlSol.SetWriter (VTK);
+  std::vector<std::string> print_vars;
+  print_vars.push_back ("All");
+  mlSol.GetWriter()->SetDebugOutput (true);
+  mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
+
+  mlSolFine.SetWriter (VTK);
+  std::vector<std::string> print_vars2;
+  print_vars2.push_back ("All");
+  mlSolFine.GetWriter()->SetDebugOutput (true);
+  mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
 
   std::cout << std::endl << " total CPU time : " << std::setw (11) << std::setprecision (6) << std::fixed
             << static_cast<double> ( (clock() - total_time)) / CLOCKS_PER_SEC << " s" << std::endl;
@@ -441,8 +445,8 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 //       double u1 = (a1 + b1 * x_gss - 1. / (2. * kappa1) * x_gss * x_gss) * (1. + x_gss * x_gss) * cos (y_gss) ;
 //       double u2 = (a2 + b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss) * cos (x_gss) * cos (y_gss);
 
-  double u1 = x_gss * x_gss * y_gss + cos(x_gss);
-  double u2 = u1;
+      double u1 = x_gss * x_gss * y_gss + cos (x_gss);
+      double u2 = u1;
 
       soluExact_gss = (x_gss < 0.) ? u1 : u2;
 
@@ -655,18 +659,13 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 
         if (fineGaussPointInCoarseElem == dim) {
 
-          std::vector<int> dofs (nDofCoarse);
-          for (unsigned jdof = 0; jdof < nDofCoarse; jdof++) {
-            dofs[jdof] = jdof;
-          }
-
-          std::vector<double> solTemp (dofs.size());
-          ReorderElement (dofs, solTemp, xCoarse);
-
           for (unsigned jdof = 0; jdof < nDofCoarse; jdof++) {
             unsigned solDof = msh->GetSolutionDof (jdof, ielCoarse, soluType);
             soluNonLocCoarse[jdof] = (*sol->_Sol[soluIndex]) (solDof);
           }
+
+          std::vector<int> dofsTemp (nDofCoarse);
+          ReorderElement (dofsTemp, soluNonLocCoarse, xCoarse);
 
           std::vector<double> x_gss_fine_Local (dim, 0.);
           for (unsigned ii = 0; ii < dim; ii++) {
@@ -680,7 +679,7 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 //           femQuadrature->Jacobian (xCoarse, x_gss_fine_Local, weight2, phi2, phi_x2);
 
           for (unsigned jdof = 0; jdof < nDofCoarse; jdof++) {
-            soluNonLocCoarse_gss += soluNonLocCoarse[dofs[jdof]] * phi2[jdof];
+            soluNonLocCoarse_gss += soluNonLocCoarse[jdof] * phi2[jdof];
           }
 
           break;
@@ -716,7 +715,186 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 }
 
 
+void GetL2NormLocalConnectedNonlocalFine (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 
+  const unsigned level = mlSol._mlMesh->GetNumberOfLevels() - 1;
+  Mesh* msh = mlSol._mlMesh->GetLevel (level);
+  Solution* sol  = mlSol.GetSolutionLevel (level);
+
+  const unsigned levelFine = mlSolFine._mlMesh->GetNumberOfLevels() - 1;
+  Mesh* mshFine = mlSolFine._mlMesh->GetLevel (levelFine);
+  Solution* solFine  = mlSolFine.GetSolutionLevel (levelFine);
+
+  const unsigned  dim = msh->GetDimension();
+
+  unsigned xType = 2; // get the finite element type for "x", it is always 2 (LAGRANGE QUADRATIC)
+
+  unsigned soluIndexLocal;
+  soluIndexLocal = mlSol.GetIndex ("u_local");
+  unsigned soluType = mlSol.GetSolutionType (soluIndexLocal);
+
+  unsigned soluIndexFine;
+  soluIndexFine = mlSolFine.GetIndex ("u_fine");
+
+  unsigned    iproc = msh->processor_id();
+  unsigned    nprocs = msh->n_processors();
+
+  double error_Loc_NonLocFine_norm2 = 0.;
+
+  //BEGIN ||local on connected grid - nonlocal on nonconnected grid||_L2 on nonconnected grid
+
+  std::cout << "------------------------------------- " << std::endl;
+
+  unsigned    iprocFine = mshFine->processor_id(); // get the process_id (for parallel computation)
+
+  for (int ielFine = solFine->GetMesh()->_elementOffset[iprocFine]; ielFine < solFine->GetMesh()->_elementOffset[iprocFine + 1]; ielFine ++) {
+
+    short unsigned ielFineGeom = mshFine->GetElementType (ielFine);
+    unsigned nDofFine  = mshFine->GetElementDofNumber (ielFine, soluType);
+
+    vector < double >  soluNonLocFine (nDofFine);
+
+    std::vector < std::vector <double> > xFine (dim);
+
+    for (int k = 0; k < dim; k++) {
+      xFine[k].assign (nDofFine, 0.);
+    }
+
+    for (unsigned i = 0; i < nDofFine; i++) {
+      unsigned solDof = mshFine->GetSolutionDof (i, ielFine, soluType);
+      soluNonLocFine[i] = (*solFine->_Sol[soluIndexFine]) (solDof);
+      unsigned xDof  = mshFine->GetSolutionDof (i, ielFine, xType);
+      for (unsigned jdim = 0; jdim < dim; jdim++) {
+        xFine[jdim][i] = (*mshFine->_topology->_Sol[jdim]) (xDof);
+      }
+    }
+
+    vector <double> phi;  // local test function
+    vector <double> phi_x; // local test function first order partial derivatives
+    double weight; // gauss point weight
+
+    unsigned igNumberFine = mshFine->_finiteElement[ielFineGeom][soluType]->GetGaussPointNumber();
+//     unsigned igNumberFine = femQuadrature->GetGaussPointNumber();
+
+    // *** Gauss point loop ***
+    for (unsigned ig = 0; ig < igNumberFine; ig++) {
+      // *** get gauss point weight, test function and test function partial derivatives ***
+      mshFine->_finiteElement[ielFineGeom][soluType]->Jacobian (xFine, ig, weight, phi, phi_x);
+//       femQuadrature->Jacobian (xFine, ig, weight, phi, phi_x);
+
+      double soluLoc_gss = 0.;
+      double soluNonLocFine_gss = 0.;
+      std::vector <double> x_gss_fine (dim, 0.);
+
+
+      for (unsigned i = 0; i < nDofFine; i++) {
+        soluNonLocFine_gss += phi[i] * soluNonLocFine[i];
+        for (unsigned jdim = 0; jdim < dim; jdim++) {
+          x_gss_fine[jdim] += phi[i] * xFine[jdim][i];
+        }
+      }
+
+      //BEGIN computation of the local solution at the fine Gauss point
+
+      for (int ielLocal = sol->GetMesh()->_elementOffset[iproc]; ielLocal < sol->GetMesh()->_elementOffset[iproc + 1]; ielLocal++) {
+
+        short unsigned ielGeomLocal = msh->GetElementType (ielLocal);
+        unsigned nDofLocal  = msh->GetElementDofNumber (ielLocal, soluType);
+
+        vector < double >  soluLocLocal (nDofLocal);
+
+        std::vector < std::vector <double> > xLocal (dim);
+
+        for (int k = 0; k < dim; k++) {
+          xLocal[k].resize (nDofLocal);
+        }
+
+        for (unsigned jdof = 0; jdof < nDofLocal; jdof++) {
+          unsigned xDof  = msh->GetSolutionDof (jdof, ielLocal, xType);
+          unsigned solDof = msh->GetSolutionDof (jdof, ielLocal, soluType);
+          for (unsigned k = 0; k < dim; k++) {
+            xLocal[k][jdof] = (*sol->GetMesh()->_topology->_Sol[k]) (xDof);
+          }
+        }
+
+
+        std::vector<std::vector<double>> xMinAndMax (dim);
+        xMinAndMax[0].assign (2, 0.);
+        xMinAndMax[1].assign (2, 0.);
+
+        xMinAndMax[0][0] = xLocal[0][0];
+        xMinAndMax[0][1] = xLocal[0][2];
+        xMinAndMax[1][0] = xLocal[1][0];
+        xMinAndMax[1][1] = xLocal[1][2];
+
+
+        for (unsigned i = 0; i < nDofLocal; i++) {
+          if (xLocal[0][i] < xMinAndMax[0][0]) xMinAndMax[0][0] = xLocal[0][i];
+
+          if (xLocal[0][i] > xMinAndMax[0][1]) xMinAndMax[0][1] = xLocal[0][i];
+
+          if (xLocal[1][i] < xMinAndMax[1][0]) xMinAndMax[1][0] = xLocal[1][i];
+
+          if (xLocal[1][i] > xMinAndMax[1][1]) xMinAndMax[1][1] = xLocal[1][i];
+        }
+
+        unsigned fineGaussPointInLocalMeshElem = 0;
+
+        for (unsigned kdim = 0; kdim < dim; kdim++) {
+          if ( (x_gss_fine[kdim] > xMinAndMax[kdim][0] && x_gss_fine[kdim] < xMinAndMax[kdim][1]) || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][0]) < 1.e-10 || fabs (x_gss_fine[kdim] - xMinAndMax[kdim][1]) < 1.e-10) {
+            fineGaussPointInLocalMeshElem++;
+          }
+        }
+
+        if (fineGaussPointInLocalMeshElem == dim) {
+
+
+          for (unsigned jdof = 0; jdof < nDofLocal; jdof++) {
+            unsigned solDof = msh->GetSolutionDof (jdof, ielLocal, soluType);
+            soluLocLocal[jdof] = (*sol->_Sol[soluIndexLocal]) (solDof);
+          }
+
+          std::vector<int> dofsTemp (nDofLocal);
+          ReorderElement (dofsTemp, soluLocLocal, xLocal);
+
+          std::vector<double> x_gss_fine_Local (dim, 0.);
+          for (unsigned ii = 0; ii < dim; ii++) {
+            x_gss_fine_Local[ii] = - 1. + 2. * (x_gss_fine[ii] - xLocal[ii][ii]) / (xLocal[ii][ii + 1] - xLocal[ii][ii]);
+          }
+
+          vector <double> phi2;  // local test function
+          vector <double> phi_x2; // local test function first order partial derivatives
+          double weight2; // gauss point weight
+          msh->_finiteElement[ielGeomLocal][soluType]->Jacobian (xLocal, x_gss_fine_Local, weight2, phi2, phi_x2);
+//           femQuadrature->Jacobian (xLocal, x_gss_fine_Local, weight2, phi2, phi_x2);
+
+          for (unsigned jdof = 0; jdof < nDofLocal; jdof++) {
+            soluLoc_gss += soluLocLocal[jdof] * phi2[jdof];
+          }
+
+          break;
+
+        }
+      }
+
+      //END computation of the fine solution at the coarse Gauss point
+
+
+      error_Loc_NonLocFine_norm2 += (soluLoc_gss - soluNonLocFine_gss) * (soluLoc_gss - soluNonLocFine_gss) * weight;
+
+    }
+
+  }
+
+  double norm2 = 0.;
+  MPI_Allreduce (&error_Loc_NonLocFine_norm2, &norm2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  double norm = sqrt (norm2);
+  std::cout.precision (14);
+  std::cout << "L2 norm of ERROR: Local (connected grid) - Nonlocal (nonconnected grid) = " << norm << std::endl;
+
+  //END
+
+}
 
 
 
