@@ -42,7 +42,7 @@ double InitalValueU (const std::vector < double >& x) {
 //   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
 //   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
 
-  double u1 = x[0] * x[0] * x[1] + cos (x[0]);
+  double u1 = x[0] * x[0] * x[1] + sin (x[0]) + 1.;
   double u2 = u1;
 
   value = (x[0] < 0.) ? u1 : u2;
@@ -74,7 +74,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
 //   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
 //   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
 
-  double u1 = x[0] * x[0] * x[1] + cos (x[0]);
+  double u1 = x[0] * x[0] * x[1] + sin (x[0]) + 1.;
   double u2 = u1;
 
   value = (x[0] < 0.) ? u1 : u2;
@@ -83,7 +83,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
     if (!strcmp (SolName, "u_local")) {
 //       value = a1 ;
 //       value = a1 * cos (x[1]) ;
-      value = 1.;
+//       value = 1.;
     }
     else {
       dirichlet = false; //Neumann at the interface boundaries
@@ -94,8 +94,8 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
   return dirichlet;
 }
 
-unsigned numberOfUniformLevels = 1;
-unsigned numberOfUniformLevelsFine = 6;
+unsigned numberOfUniformLevels = 5;
+unsigned numberOfUniformLevelsFine = 5;
 
 int main (int argc, char** argv) {
 
@@ -142,13 +142,13 @@ int main (int argc, char** argv) {
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_bis.neu", "eighth", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5_bis.neu", "eighth", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis.neu", "eighth", scalingFactor);
-     mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
+//      mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //      mlMsh.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
-//   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_connected.neu", "second", scalingFactor);
+  mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_connected.neu", "second", scalingFactor);
   mlMsh.RefineMesh (numberOfUniformLevels + numberOfSelectiveLevels, numberOfUniformLevels , NULL);
 
-//   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
+  mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5.neu", "second", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6.neu", "second", scalingFactor);
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7.neu", "second", scalingFactor);
@@ -156,7 +156,7 @@ int main (int argc, char** argv) {
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_bis.neu", "eighth", scalingFactor);
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5_bis.neu", "eighth", scalingFactor);
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis.neu", "eighth", scalingFactor);
-     mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
+//      mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_connected.neu", "second", scalingFactor);
@@ -242,7 +242,7 @@ int main (int argc, char** argv) {
 
 // ******* Solution *******
 
-  system.MGsolve();
+//   system.MGsolve(); //TODO
 
   //END assemble and solve nonlocal problem
 
@@ -323,7 +323,7 @@ int main (int argc, char** argv) {
 
   //BEGIN compute errors
   GetL2Norm (mlSol, mlSolFine);
-//   GetL2NormLocalConnectedNonlocalFine (mlSol, mlSolFine); // TODO
+  GetL2NormLocalConnectedNonlocalFine (mlSol, mlSolFine); // TODO
   //END compute errors
 
   // ******* Print solution *******
