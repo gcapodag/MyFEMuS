@@ -138,8 +138,8 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
   return dirichlet;
 }
 
-unsigned numberOfUniformLevels = 1;
-unsigned numberOfUniformLevelsFine = 6;
+unsigned numberOfUniformLevels = 4;
+unsigned numberOfUniformLevelsFine = 5;
 
 int main (int argc, char** argv) {
 
@@ -178,7 +178,7 @@ int main (int argc, char** argv) {
 //     mlMsh.ReadCoarseMesh ( "../input/martaTest4Coarser.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial1.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial2.neu", "second", scalingFactor );
-//   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
+  mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6.neu", "second", scalingFactor);
 //     mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7.neu", "second", scalingFactor);
@@ -186,7 +186,7 @@ int main (int argc, char** argv) {
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_bis.neu", "eighth", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5_bis.neu", "eighth", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis.neu", "eighth", scalingFactor);
-  mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
+//   mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //      mlMsh.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
 //   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_co.neu", "second", scalingFactor);
@@ -196,7 +196,7 @@ int main (int argc, char** argv) {
 //          mlMsh.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_co.neu", "second", scalingFactor);
   mlMsh.RefineMesh (numberOfUniformLevels + numberOfSelectiveLevels, numberOfUniformLevels , NULL);
 
-//   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
+  mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5.neu", "second", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6.neu", "second", scalingFactor);
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7.neu", "second", scalingFactor);
@@ -204,7 +204,7 @@ int main (int argc, char** argv) {
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_bis.neu", "eighth", scalingFactor);
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5_bis.neu", "eighth", scalingFactor);
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis.neu", "eighth", scalingFactor);
-  mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
+//   mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_co.neu", "second", scalingFactor);
@@ -375,17 +375,17 @@ int main (int argc, char** argv) {
   //END compute errors
 
   // ******* Print solution *******
-  mlSol.SetWriter (VTK);
-  std::vector<std::string> print_vars;
-  print_vars.push_back ("All");
-  mlSol.GetWriter()->SetDebugOutput (true);
-  mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
-
-  mlSolFine.SetWriter (VTK);
-  std::vector<std::string> print_vars2;
-  print_vars2.push_back ("All");
-  mlSolFine.GetWriter()->SetDebugOutput (true);
-  mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
+//   mlSol.SetWriter (VTK);
+//   std::vector<std::string> print_vars;
+//   print_vars.push_back ("All");
+//   mlSol.GetWriter()->SetDebugOutput (true);
+//   mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
+// 
+//   mlSolFine.SetWriter (VTK);
+//   std::vector<std::string> print_vars2;
+//   print_vars2.push_back ("All");
+//   mlSolFine.GetWriter()->SetDebugOutput (true);
+//   mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
 //
   std::cout << std::endl << " total CPU time : " << std::setw (11) << std::setprecision (6) << std::fixed
             << static_cast<double> ( (clock() - total_time)) / CLOCKS_PER_SEC << " s" << std::endl;
