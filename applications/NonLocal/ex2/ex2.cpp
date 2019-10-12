@@ -39,35 +39,35 @@ double InitalValueU (const std::vector < double >& x) {
 //   double u1 = a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0] ;
 //   double u2 = a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0] ;
 
-//   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
-//   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
+  double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
+  double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
 
 //   double u1 = x[0] * x[0] * x[1] + cos (x[0]) ;
 //   double u2 = u1;
 //
-//   value = (x[0] < 0.) ? u1 : u2;
+  value = (x[0] < 0.) ? u1 : u2;
 
-  if (x[1] > 0.5 || x[1] < - 0.5) {
-
-    value = 1. / 16.;
-
-  }
-
-  else {
-
-    if (x[0] < 0.) {
-
-      value = a1 + (b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
-
-    }
-
-    else {
-
-      value = a2 + (b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
-
-    }
-
-  }
+//   if (x[1] > 0.5 || x[1] < - 0.5) {
+// 
+//     value = 1. / 16.;
+// 
+//   }
+// 
+//   else {
+// 
+//     if (x[0] < 0.) {
+// 
+//       value = a1 + (b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
+// 
+//     }
+// 
+//     else {
+// 
+//       value = a2 + (b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
+// 
+//     }
+// 
+//   }
 
 
   return value;
@@ -93,40 +93,40 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
 //   double u1 = a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0] ;
 //   double u2 = a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0] ;
 
-//   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
-//   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
+  double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
+  double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
 
 //   double u1 = x[0] * x[0] * x[1] + cos (x[0]) ;
 //   double u2 = u1;
 //
-//   value = (x[0] < 0.) ? u1 : u2;
+  value = (x[0] < 0.) ? u1 : u2;
 
-  if (x[1] > 0.5 || x[1] < - 0.5) {
-
-    value = 1. / 16.;
-
-  }
-
-  else {
-
-    if (x[0] < 0.) {
-
-      value = a1 + (b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
-
-    }
-
-    else {
-
-      value = a2 + (b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
-
-    }
-
-  }
+//   if (x[1] > 0.5 || x[1] < - 0.5) {
+// 
+//     value = 1. / 16.;
+// 
+//   }
+// 
+//   else {
+// 
+//     if (x[0] < 0.) {
+// 
+//       value = a1 + (b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
+// 
+//     }
+// 
+//     else {
+// 
+//       value = a2 + (b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
+// 
+//     }
+// 
+//   }
 
   if (facename == 2) {
     if (!strcmp (SolName, "u_local")) {
-      value = a1 ;
-//       value = a1 * cos (x[1]) ;
+//       value = a1 ;
+      value = a1 * cos (x[1]) ;
 //       value = 1.;
     }
     else {
@@ -139,7 +139,7 @@ bool SetBoundaryCondition (const std::vector < double >& x, const char SolName[]
 }
 
 unsigned numberOfUniformLevels = 1;
-unsigned numberOfUniformLevelsFine = 5;
+unsigned numberOfUniformLevelsFine = 6;
 
 int main (int argc, char** argv) {
 
@@ -178,7 +178,7 @@ int main (int argc, char** argv) {
 //     mlMsh.ReadCoarseMesh ( "../input/martaTest4Coarser.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial1.neu", "second", scalingFactor );
 //     mlMsh.ReadCoarseMesh ( "../input/trial2.neu", "second", scalingFactor );
-  mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
+//   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5.neu", "second", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6.neu", "second", scalingFactor);
 //     mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7.neu", "second", scalingFactor);
@@ -186,7 +186,7 @@ int main (int argc, char** argv) {
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_bis.neu", "eighth", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5_bis.neu", "eighth", scalingFactor);
 //    mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis.neu", "eighth", scalingFactor);
-//   mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
+  mlMsh.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMsh.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //      mlMsh.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
 //   mlMsh.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_co.neu", "second", scalingFactor);
@@ -196,7 +196,7 @@ int main (int argc, char** argv) {
 //          mlMsh.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_co.neu", "second", scalingFactor);
   mlMsh.RefineMesh (numberOfUniformLevels + numberOfSelectiveLevels, numberOfUniformLevels , NULL);
 
-  mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
+//   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4.neu", "second", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5.neu", "second", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6.neu", "second", scalingFactor);
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7.neu", "second", scalingFactor);
@@ -204,7 +204,7 @@ int main (int argc, char** argv) {
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_bis.neu", "eighth", scalingFactor);
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-5_d2_2e-4_h_2e-5_bis.neu", "eighth", scalingFactor);
 //    mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis.neu", "eighth", scalingFactor);
-//   mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
+  mlMshFine.ReadCoarseMesh ("../input/d1_2e-6_d2_2e-5_h_2e-6_bis_bis.neu", "eighth", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-7_d2_2e-6_h_2e-7_bis.neu", "eighth", scalingFactor);
 //     mlMshFine.ReadCoarseMesh ("../input/d1_2e-8_d2_2e-7_h_2e-8_bis.neu", "eighth", scalingFactor);
 //   mlMshFine.ReadCoarseMesh ("../input/d1_2e-4_d2_2e-3_h_2e-4_co.neu", "second", scalingFactor);
@@ -375,17 +375,17 @@ int main (int argc, char** argv) {
   //END compute errors
 
   // ******* Print solution *******
-//   mlSol.SetWriter (VTK);
-//   std::vector<std::string> print_vars;
-//   print_vars.push_back ("All");
-//   mlSol.GetWriter()->SetDebugOutput (true);
-//   mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
-// 
-//   mlSolFine.SetWriter (VTK);
-//   std::vector<std::string> print_vars2;
-//   print_vars2.push_back ("All");
-//   mlSolFine.GetWriter()->SetDebugOutput (true);
-//   mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
+  mlSol.SetWriter (VTK);
+  std::vector<std::string> print_vars;
+  print_vars.push_back ("All");
+  mlSol.GetWriter()->SetDebugOutput (true);
+  mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "nonlocal_local_exact", print_vars, 0);
+
+  mlSolFine.SetWriter (VTK);
+  std::vector<std::string> print_vars2;
+  print_vars2.push_back ("All");
+  mlSolFine.GetWriter()->SetDebugOutput (true);
+  mlSolFine.GetWriter()->Write (DEFAULT_OUTPUTDIR, "fine", print_vars2, 0);
 //
   std::cout << std::endl << " total CPU time : " << std::setw (11) << std::setprecision (6) << std::fixed
             << static_cast<double> ( (clock() - total_time)) / CLOCKS_PER_SEC << " s" << std::endl;
@@ -491,37 +491,37 @@ void GetL2Norm (MultiLevelSolution & mlSol, MultiLevelSolution & mlSolFine) {
 //       double u1 = a1 + b1 * x_gss - 1. / (2. * kappa1) * x_gss * x_gss;
 //       double u2 = a2 + b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss;
 
-//       double u1 = (a1 + b1 * x_gss - 1. / (2. * kappa1) * x_gss * x_gss) * (1. + x_gss * x_gss) * cos (y_gss) ;
-//       double u2 = (a2 + b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss) * cos (x_gss) * cos (y_gss);
+      double u1 = (a1 + b1 * x_gss - 1. / (2. * kappa1) * x_gss * x_gss) * (1. + x_gss * x_gss) * cos (y_gss) ;
+      double u2 = (a2 + b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss) * cos (x_gss) * cos (y_gss);
 
 //       double u1 = x_gss * x_gss * y_gss + cos (x_gss);
 //       double u2 = u1;
 //
-//       soluExact_gss = (x_gss < 0.) ? u1 : u2;
+      soluExact_gss = (x_gss < 0.) ? u1 : u2;
 
 
 
-      if (y_gss > 0.5 || y_gss < - 0.5) {
-
-        soluExact_gss = 1. / 16.;
-
-      }
-
-      else {
-
-        if (x_gss < 0.) {
-
-          soluExact_gss = a1 + (b1 * x_gss - 1. / (2. * kappa1) * x_gss * x_gss) * (y_gss * y_gss - 0.5 * 0.5);
-
-        }
-
-        else {
-
-          soluExact_gss = a2 + (b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss) * (y_gss * y_gss - 0.5 * 0.5);
-
-        }
-
-      }
+//       if (y_gss > 0.5 || y_gss < - 0.5) {
+// 
+//         soluExact_gss = 1. / 16.;
+// 
+//       }
+// 
+//       else {
+// 
+//         if (x_gss < 0.) {
+// 
+//           soluExact_gss = a1 + (b1 * x_gss - 1. / (2. * kappa1) * x_gss * x_gss) * (y_gss * y_gss - 0.5 * 0.5);
+// 
+//         }
+// 
+//         else {
+// 
+//           soluExact_gss = a2 + (b2 * x_gss - 1. / (2. * kappa2) * x_gss * x_gss) * (y_gss * y_gss - 0.5 * 0.5);
+// 
+//         }
+// 
+//       }
 
 //             soluExact_gss = x_gss * x_gss * x_gss * x_gss + 0.1 * x_gss * x_gss; // this is x^4 + delta * x^2
 
