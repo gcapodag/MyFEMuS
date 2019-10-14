@@ -27,8 +27,8 @@ bool nonLocalAssembly = true;
 
 //DELTA sizes: martaTest1: 0.4, martaTest2: 0.01, martaTest3: 0.53, martaTest4: 0.2, maxTest1: both 0.4, maxTest2: both 0.01, maxTest3: both 0.53, maxTest4: both 0.2, maxTest5: both 0.1, maxTest6: both 0.8,  maxTest7: both 0.05, maxTest8: both 0.025, maxTest9: both 0.0125, maxTest10: both 0.00625
 
-double delta1 = pow (2., -4.); //DELTA SIZES (w 2 refinements): interface: delta1 = 0.4, delta2 = 0.2, nonlocal_boundary_test.neu: 0.0625 * 4
-double delta2 = pow (2., -3.);
+double delta1 = pow (2., -8.); //DELTA SIZES (w 2 refinements): interface: delta1 = 0.4, delta2 = 0.2, nonlocal_boundary_test.neu: 0.0625 * 4
+double delta2 = pow (2., -7.);
 // double epsilon = ( delta1 > delta2 ) ? delta1 : delta2;
 double kappa1 = 1.;
 double kappa2 = 3.;
@@ -46,32 +46,32 @@ void GetBoundaryFunctionValue (double &value, const std::vector < double >& x) {
 //   double u1 = (a1 + b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (1. + x[0] * x[0]) * cos (x[1]) ;
 //   double u2 = (a2 + b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * cos (x[0]) * cos (x[1]);
 
-  double u1 = x[0] * x[0] * x[1] + cos (x[0]);
-  double u2 = u1;
+//   double u1 = x[0] * x[0] * x[1] + cos (x[0]);
+//   double u2 = u1;
 //
-  value = (x[0] < 0.) ? u1 : u2;
+//   value = (x[0] < 0.) ? u1 : u2;
 
-//   if (x[1] > 0.5 || x[1] < - 0.5) {
-// 
-//     value = 1. / 16.;
-// 
-//   }
-// 
-//   else {
-// 
-//     if (x[0] < 0.) {
-// 
-//       value = a1 + (b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
-// 
-//     }
-// 
-//     else {
-// 
-//       value = a2 + (b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
-// 
-//     }
-// 
-//   }
+  if (x[1] > 0.5 || x[1] < - 0.5) {
+
+    value = 1. / 16.;
+
+  }
+
+  else {
+
+    if (x[0] < 0.) {
+
+      value = a1 + (b1 * x[0] - 1. / (2. * kappa1) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
+
+    }
+
+    else {
+
+      value = a2 + (b2 * x[0] - 1. / (2. * kappa2) * x[0] * x[0]) * (x[1] * x[1] - 0.5 * 0.5);
+
+    }
+
+  }
 
 //     value = 0.;
 //     value = x[0];
@@ -387,15 +387,15 @@ void AssembleNonLocalSys (MultiLevelProblem& ml_prob) {
                 if (xg1[ig][0] < 0.) {
 //                   double resValue = cos (xg1[ig][1]) * (- 0.5 * xg1[ig][0] * xg1[ig][0] * xg1[ig][0] * xg1[ig][0] - kappa1 / 8. * xg1[ig][0] * xg1[ig][0] * xg1[ig][0] + 11. / 2. * xg1[ig][0] * xg1[ig][0] + kappa1 / 16. * xg1[ig][0] * xg1[ig][0] + kappa1 * 5. / 8. * xg1[ig][0] + 1. - 1. / 16. * kappa1);
 //                    //Ax - f (so f = cos(y) * ( - 0.5 * x^4 - kappa1 / 8 * x^3 + 11. / 2. * x^2 + kappa1 / 16. * x^2 + kappa1 * 5. / 8. * x + 1. - 1. / 16. * k1))
-                  double resValue = -kappa1 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k1 * (2y - cos(x))
-//                   double resValue = - kappa1 * (- (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 8. * xg1[ig][0] - 0.5 * xg1[ig][0] * xg1[ig][0])); //Ax - f (so f = -k1 * ( - (y^2 - 0.5^2 ) + 2 (-1/8 x -0.5 x^2) )
+//                   double resValue = -kappa1 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k1 * (2y - cos(x))
+                  double resValue = - kappa1 * (- (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 8. * xg1[ig][0] - 0.5 * xg1[ig][0] * xg1[ig][0])); //Ax - f (so f = -k1 * ( - (y^2 - 0.5^2 ) + 2 (-1/8 x -0.5 x^2) )
                   Res1[i] -=  resValue * weight1[ig]  * phi1x[ig][i];
                 }
                 else {
 //                   double resValue = cos (xg1[ig][1]) * (sin (xg1[ig][0]) * (-kappa2 / 12. - 2 * xg1[ig][0]) + cos (xg1[ig][0]) * (kappa2 / 8. + 1. - kappa2 / 12. * xg1[ig][0] - xg1[ig][0] * xg1[ig][0]));
 //                    //Ax - f (so f = cos(y) * (sin(x) * (-k2 / 12. - 2 * x) + cos(x) * (k2 / 8. + 1. - k2 / 12. * x - x^2)))
-                  double resValue = -kappa2 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k2 * (2y - cos(x))
-//                   double resValue = - kappa2 * (- 1./3. * (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 24. * xg1[ig][0] - 1./6. * xg1[ig][0] * xg1[ig][0])); //Ax - f (so f = -k2 * ( - 1/3(y^2 - 0.5^2 ) + 2 (-1/24 x -1/6 x^2) )
+//                   double resValue = -kappa2 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k2 * (2y - cos(x))
+                  double resValue = - kappa2 * (- 1./3. * (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 24. * xg1[ig][0] - 1./6. * xg1[ig][0] * xg1[ig][0])); //Ax - f (so f = -k2 * ( - 1/3(y^2 - 0.5^2 ) + 2 (-1/24 x -1/6 x^2) )
                   Res1[i] -=  resValue * weight1[ig]  * phi1x[ig][i];
                 }
 //                                 Res1[i] -=  - 6. * xg1[ig][0] * weight1[ig] * phi1x[ig][i]; //Ax - f (so f = - 6 x)
@@ -701,13 +701,13 @@ void AssembleLocalSys (MultiLevelProblem& ml_prob) {
         double srcTerm;
         if (x_gss[0] < 0.) {
 /*          srcTerm = - cos (x_gss[1]) * (- 0.5 * x_gss[0] * x_gss[0] * x_gss[0] * x_gss[0] - kappa1 / 8. * x_gss[0] * x_gss[0] * x_gss[0] + 11. / 2. * x_gss[0] * x_gss[0] + kappa1 / 16. * x_gss[0] * x_gss[0] + kappa1 * 5. / 8. * x_gss[0] + 1. - 1. / 16. * kappa1);*/ // f = cos(y) * ( - 0.5 * x^4 - kappa1 / 8 * x^3 + 11. / 2. * x^2 + kappa1 / 16. * x^2 + kappa1 * 5. / 8. * x + 1. - 1. / 16. * k1)
-        srcTerm =  kappa1 * (2. * x_gss[1] - cos (x_gss[0])); // so f = - k1 * (2y - cos(x))
-//            srcTerm =  kappa1 * (- (x_gss[1] * x_gss[1] - 0.5 * 0.5) + 2.* (-1. / 8. * x_gss[0] - 0.5 * x_gss[0] * x_gss[0])); // so f = -k1 * ( - (y^2 - 0.5^2 ) + 2 (-1/8 x -0.5 x^2) )
+//         srcTerm =  kappa1 * (2. * x_gss[1] - cos (x_gss[0])); // so f = - k1 * (2y - cos(x))
+           srcTerm =  kappa1 * (- (x_gss[1] * x_gss[1] - 0.5 * 0.5) + 2.* (-1. / 8. * x_gss[0] - 0.5 * x_gss[0] * x_gss[0])); // so f = -k1 * ( - (y^2 - 0.5^2 ) + 2 (-1/8 x -0.5 x^2) )
         }
         else {
 /*          srcTerm =  - cos (x_gss[1]) * (sin (x_gss[0]) * (-kappa2 / 12. - 2 * x_gss[0]) + cos (x_gss[0]) * (kappa2 / 8. + 1. - kappa2 / 12. * x_gss[0] - x_gss[0] * x_gss[0]));*/ //so f = cos(y) * (sin(x) * (-k2 / 12. - 2 * x) + cos(x) * (k2 / 8. + 1. - k2 / 12. * x - x^2))
-          srcTerm =  kappa2 * (2. * x_gss[1] - cos (x_gss[0])); // so f = - k2 * (2y - cos(x))
-//           srcTerm =  kappa2 * (- 1./3. * (x_gss[1] * x_gss[1] - 0.5 * 0.5) + 2.* (-1. / 24. * x_gss[0] - 1./6. * x_gss[0] * x_gss[0])); //so f = -k2 * ( - 1/3(y^2 - 0.5^2 ) + 2 (-1/24 x -1/6 x^2) )
+//           srcTerm =  kappa2 * (2. * x_gss[1] - cos (x_gss[0])); // so f = - k2 * (2y - cos(x))
+          srcTerm =  kappa2 * (- 1./3. * (x_gss[1] * x_gss[1] - 0.5 * 0.5) + 2.* (-1. / 24. * x_gss[0] - 1./6. * x_gss[0] * x_gss[0])); //so f = -k2 * ( - 1/3(y^2 - 0.5^2 ) + 2 (-1/24 x -1/6 x^2) )
         }
         //double srcTerm =  0./*- GetExactSolutionLaplace(x_gss)*/ ;
         aRes[i] += (srcTerm * phi[i] + laplace) * weight;
@@ -1059,15 +1059,15 @@ void AssembleNonLocalSysFine (MultiLevelProblem& ml_prob) {
                 if (xg1[ig][0] < 0.) {
 //                   double resValue = cos (xg1[ig][1]) * (- 0.5 * xg1[ig][0] * xg1[ig][0] * xg1[ig][0] * xg1[ig][0] - kappa1 / 8. * xg1[ig][0] * xg1[ig][0] * xg1[ig][0] + 11. / 2. * xg1[ig][0] * xg1[ig][0] + kappa1 / 16. * xg1[ig][0] * xg1[ig][0] + kappa1 * 5. / 8. * xg1[ig][0] + 1. - 1. / 16. * kappa1);
                        //Ax - f (so f = cos(y) * ( - 0.5 * x^4 - kappa1 / 8 * x^3 + 11. / 2. * x^2 + kappa1 / 16. * x^2 + kappa1 * 5. / 8. * x + 1. - 1. / 16. * k1))
-                  double resValue = -kappa1 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k1 * (2y - cos(x))
-//                  double resValue = - kappa1 * (- (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 8. * xg1[ig][0] - 0.5 * xg1[ig][0] * xg1[ig][0])); *///Ax - f (so f = -k1 * ( - (y^2 - 0.5^2 ) + 2 (-1/8 x -0.5 x^2) )
+//                   double resValue = -kappa1 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k1 * (2y - cos(x))
+                 double resValue = - kappa1 * (- (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 8. * xg1[ig][0] - 0.5 * xg1[ig][0] * xg1[ig][0])); ///Ax - f (so f = -k1 * ( - (y^2 - 0.5^2 ) + 2 (-1/8 x -0.5 x^2) )
                   Res1[i] -=  resValue * weight1[ig]  * phi1x[ig][i];
                 }
                 else {
 //                   double resValue = cos (xg1[ig][1]) * (sin (xg1[ig][0]) * (-kappa2 / 12. - 2 * xg1[ig][0]) + cos (xg1[ig][0]) * (kappa2 / 8. + 1. - kappa2 / 12. * xg1[ig][0] - xg1[ig][0] * xg1[ig][0]));
 //                     //Ax - f (so f = cos(y) * (sin(x) * (-k2 / 12. - 2 * x) + cos(x) * (k2 / 8. + 1. - k2 / 12. * x - x^2)))
-                  double resValue = -kappa2 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k2 * (2y - cos(x))
-//                   double resValue = - kappa2 * (- 1./3. * (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 24. * xg1[ig][0] - 1./6. * xg1[ig][0] * xg1[ig][0])); //Ax - f (so f = -k2 * ( - 1/3(y^2 - 0.5^2 ) + 2 (-1/24 x -1/6 x^2) )
+//                   double resValue = -kappa2 * (2 * xg1[ig][1] - cos (xg1[ig][0])); //Ax - f (so f = -k2 * (2y - cos(x))
+                  double resValue = - kappa2 * (- 1./3. * (xg1[ig][1] * xg1[ig][1] - 0.5 * 0.5) + 2.* (-1. / 24. * xg1[ig][0] - 1./6. * xg1[ig][0] * xg1[ig][0])); //Ax - f (so f = -k2 * ( - 1/3(y^2 - 0.5^2 ) + 2 (-1/24 x -1/6 x^2) )
                   Res1[i] -=  resValue * weight1[ig]  * phi1x[ig][i];
                 }
 //                                 Res1[i] -=  - 6. * xg1[ig][0] * weight1[ig] * phi1x[ig][i]; //Ax - f (so f = - 6 x)
