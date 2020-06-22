@@ -14,9 +14,9 @@
 
 using namespace femus;
 
-unsigned numberOfTimeSteps = 200; //RK4: dt=0.5, numberOfTimeSteps = 16001
-double dt = 0.1; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
-unsigned M = 4;
+unsigned numberOfTimeSteps = 800; //RK4: dt=0.5, numberOfTimeSteps = 16001
+double dt = 0.000025; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
+unsigned M = 1;
 
 double k_v = (2.5) * (0.00001);
 
@@ -485,6 +485,13 @@ int main (int argc, char** args) {
       sprintf (name, "K%d_%d", j + 1, i);
       mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO);
     }
+
+    for (unsigned j = 0; j < M; j++) {
+      sprintf (name, "F1st_%d_%d", j + 1, i);
+      mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO);
+      sprintf (name, "F2nd_%d_%d", j + 1, i);
+      mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO);
+    }
   }
 
   mlSol.AddSolution ("b", DISCONTINUOUS_POLYNOMIAL, ZERO, 1, false);
@@ -652,8 +659,8 @@ int main (int argc, char** args) {
     //ETD (ml_prob, numberOfTimeSteps);
     //Assembly ( ml_prob, numberOfTimeSteps );
 //     RK_HT (ml_prob, implicitEuler, numberOfTimeSteps);
-    LTS (ml_prob, M, numberOfTimeSteps);
-//     SSP_RK (ml_prob, numberOfTimeSteps);
+//     LTS (ml_prob, M, numberOfTimeSteps);
+    SSP_RK (ml_prob, numberOfTimeSteps);
     mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "linear", print_vars, (i + 1) / 1);
 
     counter2++;
@@ -3528,6 +3535,14 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
     std::vector < unsigned > solIndexK1 (NLayers); //auxiliary variable
     std::vector < unsigned > solIndexK2 (NLayers); //auxiliary variable
 
+    std::vector < std::vector < unsigned > > solIndexF1st (M);
+    std::vector < std::vector < unsigned > > solIndexF2nd (M);
+
+    for (unsigned j = 0; j < M; j++) {
+      solIndexF1st[j].resize (NLayers);
+      solIndexF2nd[j].resize (NLayers);
+    }
+
     for (unsigned i = 0; i < NLayers; i++) {
 
       char name[10];
@@ -3551,6 +3566,13 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
       sprintf (name, "K2_%d", i);  //auxiliary soln
       solIndexK2[i] = mlSol->GetIndex (name);
+
+      for (unsigned j = 0; j < M; j++) {
+        sprintf (name, "F1st_%d_%d", j + 1, i);
+        solIndexF1st[j][i] = mlSol->GetIndex (name);
+        sprintf (name, "F2nd_%d_%d", j + 1, i);
+        solIndexF2nd[j][i] = mlSol->GetIndex (name);
+      }
 
     }
 
@@ -3826,6 +3848,23 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
     //BEGIN substepping (FINE)
     for (unsigned substep = 0; substep < M; substep++) { //for the fine elements
 
+      for (unsigned k = 0; k < NumberOfLayers; k++) {
+        for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+          short unsigned ielGroup = msh->GetElementGroup (i);
+
+          if (ielGroup == 1) { //fine
+
+            double valueHT = (*sol->_Sol[solIndexHT[k]]) (i);
+
+            sol->_Sol[solIndexF2nd[substep][k]]->set (i, valueHT);
+
+            sol->_Sol[solIndexF2nd[substep][k]]->close();
+
+          }
+        }
+      }
+
       //BEGIN FIRST STEP OF SECOND STAGE (FINE)
 
       //BEGIN i loop
@@ -4046,13 +4085,14 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             double valueHT1st = HTpreviousStep + K1 ;
 
             sol->_Sol[solIndexHT1st[k]]->set (i, valueHT1st);
+            sol->_Sol[solIndexF1st[substep][k]]->set (i, valueHT1st);
 
             sol->_Sol[solIndexHT1st[k]]->close();
+            sol->_Sol[solIndexF1st[substep][k]]->close();
 
           }
         }
       }
-
       //END UPDATE SOL
 
       //END FIRST STEP OF SECOND STAGE (FINE)
@@ -4509,9 +4549,9 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
           double h = (*sol->_Sol[solIndexh[k]]) (i);
           double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
 
-          double HTpreviousStep = (*sol->_Sol[solIndexHT[k]]) (i);
+          double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
 
-          double valueHT1st = HTpreviousStep + K1 ;
+          double valueHT1st = HTold + K1 ;
 
           sol->_Sol[solIndexHT1st[k]]->set (i, valueHT1st);
 
@@ -4733,10 +4773,10 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
           double h = (*sol->_Sol[solIndexh[k]]) (i);
           double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
 
-          double HTpreviousStep = (*sol->_Sol[solIndexHT[k]]) (i);
+          double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
           double HT1st = (*sol->_Sol[solIndexHT1st[k]]) (i);
 
-          double valueHT = 0.5 * HTpreviousStep + 0.5 * HT1st + K1 ;
+          double valueHT = 0.5 * HTold + 0.5 * HT1st + K1 ;
 
           sol->_Sol[solIndexHT[k]]->set (i, valueHT);
 
@@ -4798,8 +4838,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
                 solHTm[j] = (*sol->_SolOld[solIndexHT[j]]) (i - 1);
               }
 
-              else { //group 1 //TODO check if it is correct or we need solIndexHT1st
-                solHTm[j] = (*sol->_SolOld[solIndexHT[j]]) (i - 1);
+              else { //group 1
+                solHTm[j] = (*sol->_Sol[solIndexF2nd[substep][j]]) (i - 1);
               }
 
             }
@@ -5057,7 +5097,7 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
               }
 
               else { // group 1
-                solHTm[j] = (*sol->_SolOld[solIndexHT[j]]) (i - 1); //TODO check if this is correct or if we need solIndexHT1st
+                solHTm[j] = (*sol->_Sol[solIndexF1st[substep][j]]) (i - 1);
               }
 
             }
