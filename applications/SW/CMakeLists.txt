@@ -38,5 +38,7 @@ IF(SLEPC_FOUND)
   
   ADD_SUBDIRECTORY(tracer_secondTest_splitting/)
   
+  ADD_SUBDIRECTORY(tracer_secondTest_local_time_stepping/)
+  
   ADD_SUBDIRECTORY(tracer_and_velocity/)
 ENDIF(SLEPC_FOUND)
