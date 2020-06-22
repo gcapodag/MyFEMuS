@@ -15,8 +15,8 @@
 using namespace femus;
 
 unsigned numberOfTimeSteps = 800; //RK4: dt=0.5, numberOfTimeSteps = 16001
-double dt = 0.000025; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
-unsigned M = 1;
+double dt = 0.025; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
+unsigned M = 4;
 
 double k_v = (2.5) * (0.00001);
 
@@ -659,8 +659,8 @@ int main (int argc, char** args) {
     //ETD (ml_prob, numberOfTimeSteps);
     //Assembly ( ml_prob, numberOfTimeSteps );
 //     RK_HT (ml_prob, implicitEuler, numberOfTimeSteps);
-//     LTS (ml_prob, M, numberOfTimeSteps);
-    SSP_RK (ml_prob, numberOfTimeSteps);
+    LTS (ml_prob, M, numberOfTimeSteps);
+//     SSP_RK (ml_prob, numberOfTimeSteps);
     mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "linear", print_vars, (i + 1) / 1);
 
     counter2++;
