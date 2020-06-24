@@ -14,9 +14,9 @@
 
 using namespace femus;
 
-unsigned numberOfTimeSteps = 200; //RK4: dt=0.5, numberOfTimeSteps = 16001
-double dt = 0.1; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
-unsigned M = 2;
+unsigned numberOfTimeSteps = 800; //RK4: dt=0.5, numberOfTimeSteps = 16001
+double dt = 0.000025; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
+unsigned M = 4;
 
 double k_v = (2.5) * (0.00001);
 
@@ -3878,7 +3878,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
 
             if (ielpGroup == 2) { //if element on the right is an interface 1 element
-              solHTp[j] = (1. - substep / M) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + substep / M * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+              double alpha = static_cast<double> (substep)  / M;
+              solHTp[j] = (1. - alpha) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + alpha * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
             }
 
             else {
@@ -4062,7 +4063,7 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
             sol->_Sol[solIndexHT1st[k]]->close();
             sol->_Sol[solIndexF1st[substep][k]]->close();
-
+            
           }
         }
       }
@@ -4102,7 +4103,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
 
             if (ielpGroup == 2) { //if element on the right is an interface 1 element
-              solHTp[j] = (1. - (substep + 1.) / M) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (substep + 1.) / M * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+              double beta =  static_cast<double> (substep + 1.) / M;
+              solHTp[j] = (1. - beta) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + beta * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
             }
 
             else {
@@ -4284,7 +4286,7 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             sol->_Sol[solIndexHT[k]]->set (i, valueHT);
 
             sol->_Sol[solIndexHT[k]]->close();
-
+            
           }
         }
       }
@@ -4755,7 +4757,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
             solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
             if (ielGroup == 2) {
-              solHT[j] = (1. - substep / M) * (*sol->_SolOld[solIndexHT[j]]) (i) + substep / M * (*sol->_Sol[solIndexHT1st[j]]) (i);
+                 double alpha = static_cast<double> (substep)  / M;
+              solHT[j] = (1. - alpha) * (*sol->_SolOld[solIndexHT[j]]) (i) + alpha * (*sol->_Sol[solIndexHT1st[j]]) (i);
             }
             if (ielGroup == 3) {
               solHT[j] = (*sol->_SolOld[solIndexHT[j]]) (i);
@@ -4769,7 +4772,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
 
             if (ielmGroup == 2) {
-              solHTm[j] = (1. - substep / M) * (*sol->_SolOld[solIndexHT[j]]) (i - 1) + substep / M * (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+                  double alpha = static_cast<double> (substep)  / M;
+              solHTm[j] = (1. - alpha) * (*sol->_SolOld[solIndexHT[j]]) (i - 1) + alpha * (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
             }
 
             else if (ielmGroup == 3) {
@@ -4785,7 +4789,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
 
             if (ielpGroup == 2) {
-              solHTp[j] = (1. - substep / M) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + substep / M * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+                double alpha = static_cast<double> (substep)  / M;
+              solHTp[j] = (1. - alpha) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + alpha * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
             }
 
             else {
@@ -4994,7 +4999,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
             solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
             if (ielGroup == 2) {
-              solHT[j] = (1. - (substep + 1.) / M) * (*sol->_SolOld[solIndexHT[j]]) (i) + (substep + 1.) / M * (*sol->_Sol[solIndexHT1st[j]]) (i);
+               double beta =  static_cast<double> (substep + 1.) / M;
+              solHT[j] = (1. - beta) * (*sol->_SolOld[solIndexHT[j]]) (i) + beta * (*sol->_Sol[solIndexHT1st[j]]) (i);
             }
 
             if (ielGroup == 3) {
@@ -5009,7 +5015,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
 
             if (ielmGroup == 2) {
-              solHTm[j] = (1. - (substep + 1.) / M) * (*sol->_SolOld[solIndexHT[j]]) (i - 1) + (substep + 1.) / M * (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+                double beta =  static_cast<double> (substep + 1.) / M;
+              solHTm[j] = (1. - beta) * (*sol->_SolOld[solIndexHT[j]]) (i - 1) + beta * (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
             }
 
             else if (ielmGroup == 3) {
@@ -5025,7 +5032,8 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
             solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
 
             if (ielpGroup == 2) {
-              solHTp[j] = (1. - (substep + 1.) / M) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (substep + 1.) / M * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+                double beta =  static_cast<double> (substep + 1.) / M;
+              solHTp[j] = (1. - beta) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + beta * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
             }
 
             else {
