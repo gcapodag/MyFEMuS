@@ -12,6 +12,8 @@
 #include <slepcmfn.h>
 #include <slepcsvd.h>
 
+//LOCAL TIME STEPPING SCHEME BY HOANG ET AL. ON 2D TRACER EQUATION
+
 using namespace femus;
 
 unsigned numberOfTimeSteps = 200; //RK4: dt=0.5, numberOfTimeSteps = 16001
@@ -25,8 +27,8 @@ double pi = acos (-1.);
 double k_h = 0.0001 ;
 
 const unsigned NumberOfLayers = 20;
-unsigned RK_order = 4;
-unsigned LTS_order = 2;
+unsigned RK_order = 4; // keep =4 to run LTS (we use K1 and K2 as auxiliary variables)
+unsigned LTS_order = 3;
 
 unsigned counter = 0;
 unsigned counter2 = 0;
@@ -480,6 +482,8 @@ int main (int argc, char** args) {
     mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO, 2);
     sprintf (name, "HT%d_1st", i);
     mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO, 0, false);
+    sprintf (name, "HT%d_2nd", i);
+    mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO, 0, false);
 
     for (unsigned j = 0; j < RK_order; j++) {
       sprintf (name, "K%d_%d", j + 1, i);
@@ -490,6 +494,8 @@ int main (int argc, char** args) {
       sprintf (name, "F1st_%d_%d", j + 1, i);
       mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO);
       sprintf (name, "F2nd_%d_%d", j + 1, i);
+      mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO);
+      sprintf (name, "F3rd_%d_%d", j + 1, i);
       mlSol.AddSolution (name, DISCONTINUOUS_POLYNOMIAL, ZERO);
     }
   }
@@ -659,8 +665,8 @@ int main (int argc, char** args) {
     //ETD (ml_prob, numberOfTimeSteps);
     //Assembly ( ml_prob, numberOfTimeSteps );
 //     RK_HT (ml_prob, implicitEuler, numberOfTimeSteps);
-    LTS (ml_prob, M, numberOfTimeSteps);
-//     SSP_RK (ml_prob, numberOfTimeSteps);
+//     LTS (ml_prob, M, numberOfTimeSteps);
+    SSP_RK (ml_prob, numberOfTimeSteps);
     mlSol.GetWriter()->Write (DEFAULT_OUTPUTDIR, "linear", print_vars, (i + 1) / 1);
 
     counter2++;
@@ -3808,7 +3814,6 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
           double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
 
           double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
-          double Hvalue = (*sol->_Sol[solIndexh[k]]) (i);
 
           double valueHT1st = HTold + K1 ;
 
@@ -4371,10 +4376,10 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
       //END UPDATE SOL
 
-      //END SECOND STEP OF SECOND STAGE  
+      //END SECOND STEP OF SECOND STAGE
 
     }
-    //END substepping 
+    //END substepping
 
     //BEGIN THIRD STAGE (interface correction)
 
@@ -4871,7 +4876,7 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
     //--------------------------------------------------------------------------------------------------------------------------//
 
-//BEGIN SET AND PRINT T
+    //BEGIN SET AND PRINT T
 
     for (unsigned k = 0; k < NumberOfLayers; k++) {
       for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
@@ -4897,35 +4902,27 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
   }
 
-}
-
-void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
-
-  const unsigned& NLayers = NumberOfLayers;
-
-  unsigned level = ml_prob._ml_msh->GetNumberOfLevels() - 1u;
-
-  Mesh* msh = ml_prob._ml_msh->GetLevel (level);
-  elem* el = msh->el;
-
-  MultiLevelSolution* mlSol = ml_prob._ml_sol;
-  Solution* sol = ml_prob._ml_sol->GetSolutionLevel (level);
-
-  const unsigned  dim = msh->GetDimension();
-
-  unsigned    iproc = msh->processor_id();
-  unsigned    nprocs = msh->n_processors();
-
-  if (LTS_order == 2) { //SSP_RK scheme of order 2
+  else if (LTS_order == 3) {
 
     std::vector < unsigned > solIndexh (NLayers);
     std::vector < unsigned > solIndexv (NLayers);
     std::vector < unsigned > solIndexHT (NLayers);
     std::vector < unsigned > solIndexT (NLayers);
     std::vector < unsigned > solIndexHT1st (NLayers);
+    std::vector < unsigned > solIndexHT2nd (NLayers);
 
     std::vector < unsigned > solIndexK1 (NLayers); //auxiliary variable
     std::vector < unsigned > solIndexK2 (NLayers); //auxiliary variable
+
+    std::vector < std::vector < unsigned > > solIndexF1st (M);
+    std::vector < std::vector < unsigned > > solIndexF2nd (M);
+    std::vector < std::vector < unsigned > > solIndexF3rd (M);
+
+    for (unsigned j = 0; j < M; j++) {
+      solIndexF1st[j].resize (NLayers);
+      solIndexF2nd[j].resize (NLayers);
+      solIndexF3rd[j].resize (NLayers);
+    }
 
     for (unsigned i = 0; i < NLayers; i++) {
 
@@ -4945,8 +4942,24 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
       sprintf (name, "HT%d_1st", i);
       solIndexHT1st[i] = mlSol->GetIndex (name);
 
+      sprintf (name, "HT%d_2nd", i);
+      solIndexHT2nd[i] = mlSol->GetIndex (name);
+
       sprintf (name, "K1_%d", i);  //auxiliary soln
       solIndexK1[i] = mlSol->GetIndex (name);
+
+      sprintf (name, "K2_%d", i);  //auxiliary soln
+      solIndexK2[i] = mlSol->GetIndex (name);
+
+
+      for (unsigned j = 0; j < M; j++) {
+        sprintf (name, "F1st_%d_%d", j + 1, i);
+        solIndexF1st[j][i] = mlSol->GetIndex (name);
+        sprintf (name, "F2nd_%d_%d", j + 1, i);
+        solIndexF2nd[j][i] = mlSol->GetIndex (name);
+        sprintf (name, "F3rd_%d_%d", j + 1, i);
+        solIndexF3rd[j][i] = mlSol->GetIndex (name);
+      }
 
     }
 
@@ -4997,86 +5010,85 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
     unsigned start = msh->_dofOffset[solTypeHT][iproc];
     unsigned end = msh->_dofOffset[solTypeHT][iproc + 1];
 
-    //BEGIN FIRST STAGE
+    //BEGIN FIRST STAGE (interface prediction)
+
+    //BEGIN FIRST STEP OF FIRST STAGE
 
     //BEGIN i loop
     for (unsigned i =  start; i <  end; i++) {
 
-      for (unsigned j = 0; j < NLayers; j++) {
+      short unsigned ielGroup = msh->GetElementGroup (i);
 
-        solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
-        solHT[j] = (*sol->_Sol[solIndexHT[j]]) (i);
+      if (ielGroup == 2 || ielGroup == 3) { //interface 1 and interface 2
 
-        solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
-        solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+        for (unsigned j = 0; j < NLayers; j++) {
 
-        if (i > start) {
-          solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
-          solHTm[j] = (*sol->_Sol[solIndexHT[j]]) (i - 1);
+          solh[j] = (*sol->_SolOld[solIndexh[j]]) (i);
+          solHT[j] = (*sol->_SolOld[solIndexHT[j]]) (i);
+
+          solvm[j] = (*sol->_SolOld[solIndexv[j]]) (i);
+          solvp[j] = (*sol->_SolOld[solIndexv[j]]) (i + 1);
+
+          solhm[j] = (*sol->_SolOld[solIndexh[j]]) (i - 1);
+          solHTm[j] = (*sol->_SolOld[solIndexHT[j]]) (i - 1);
+
+          solhp[j] = (*sol->_SolOld[solIndexh[j]]) (i + 1);
+          solHTp[j] = (*sol->_SolOld[solIndexHT[j]]) (i + 1);
 
         }
 
-        if (i < end - 1) {
-          solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
-          solHTp[j] = (*sol->_Sol[solIndexHT[j]]) (i + 1);
+        vector < double > x (2);   // local coordinates
 
+        for (unsigned j = 0; j < 2; j++) {
+          unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+          x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
         }
 
-      }
+        double dx = fabs (x[1] - x[0]);
 
-      vector < double > x (2);   // local coordinates
+        std::vector < double > w (NLayers + 1, 0.);
 
-      for (unsigned j = 0; j < 2; j++) {
-        unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
-        x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
-      }
+        std::vector < double > zTop (NLayers);
+        zTop[0] = 0;
 
-      double dx = fabs (x[1] - x[0]);
-
-      std::vector < double > w (NLayers + 1, 0.);
-
-      std::vector < double > zTop (NLayers);
-      zTop[0] = 0;
-
-      for (unsigned k = 1; k < NLayers; k++) {
-        zTop[k] = zTop[k - 1] - solh[k];
-      }
-
-      std::vector < double > psi2 (NLayers);
-
-      for (unsigned k = 0; k < NLayers; k++) {
-        //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
-        psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
-      }
-
-      double xmid = 0.5 * (x[1] + x[0]);
-
-      for (unsigned k = NLayers; k > 1; k--) {
-        w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
-        //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
-
-        //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
-        //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
-        if (maxW[k - 1] < w[k - 1]) {
-          maxW[k - 1] = w[k - 1];
+        for (unsigned k = 1; k < NLayers; k++) {
+          zTop[k] = zTop[k - 1] - solh[k];
         }
-      }
+
+        std::vector < double > psi2 (NLayers);
+
+        for (unsigned k = 0; k < NLayers; k++) {
+          //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+          psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+        }
+
+        double xmid = 0.5 * (x[1] + x[0]);
+
+        for (unsigned k = NLayers; k > 1; k--) {
+          w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+          //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+          //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+          //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+          if (maxW[k - 1] < w[k - 1]) {
+            maxW[k - 1] = w[k - 1];
+          }
+        }
 
 
-      for (unsigned k = 0; k < NLayers; k++) {
-        double RHS = 0.;
+        for (unsigned k = 0; k < NLayers; k++) {
+          double RHS = 0.;
 
-        //BEGIN HORIZONTAL ADVECTION
-        //BEGIN CENTRAL DIFF hT multiplied
+          //BEGIN HORIZONTAL ADVECTION
+          //BEGIN CENTRAL DIFF hT multiplied
 //                         if ( i > start ) {
 //                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
 //                         }
 //                         if ( i < end - 1 ) {
 //                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
 //                         }
-        //END
-        //BEGIN FIRST ORDER UPWINDING hT multiplied
-        if (i > start) {
+          //END
+          //BEGIN FIRST ORDER UPWINDING hT multiplied
           if (solvm[k] > 0) {
             RHS += solHTm[k] * solvm[k] / dx;
           }
@@ -5084,9 +5096,7 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
           else {
             RHS += solHT[k] * solvm[k] / dx;
           }
-        }
 
-        if (i < end - 1) {
           if (solvp[k] > 0) {
             RHS -= solHT[k] * solvp[k] / dx;
           }
@@ -5094,89 +5104,84 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
           else {
             RHS -= solHTp[k] * solvp[k] / dx;
           }
-        }
+          //END
+          //END HORIZONTAL ADVECTION
 
-        //END
-        //END HORIZONTAL ADVECTION
-
-        //BEGIN VERTICAL ADVECTION
-        //BEGIN CENTRAL DIFF hT multiplied
+          //BEGIN VERTICAL ADVECTION
+          //BEGIN CENTRAL DIFF hT multiplied
 //                 if ( k < NLayers - 1 ) {
 //                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
 //                 }
 //                 if ( k > 0 ) {
 //                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
 //                 }
-        //END
-        //BEGIN FIRST ORDER UPWIND hT multiplied
-        if (k < NLayers - 1) {
-          if (w[k + 1] > 0) {
-            RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+          //END
+          //BEGIN FIRST ORDER UPWIND hT multiplied
+          if (k < NLayers - 1) {
+            if (w[k + 1] > 0) {
+              RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+            }
+
+            else {
+              RHS += w[k + 1] * (solHT[k] / solh[k]);
+            }
           }
 
-          else {
-            RHS += w[k + 1] * (solHT[k] / solh[k]);
+          if (k > 0) {
+            if (w[k] > 0) {
+              RHS -= w[k] * (solHT[k] / solh[k]);
+            }
+
+            else {
+              RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+            }
           }
-        }
 
-        if (k > 0) {
-          if (w[k] > 0) {
-            RHS -= w[k] * (solHT[k] / solh[k]);
-          }
+          //END
+          //END VERTICAL ADVECTION
 
-          else {
-            RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
-          }
-        }
-
-        //END
-        //END VERTICAL ADVECTION
-
-        //BEGIN HORIZONTAL DIFFUSION hT multiplied
-        if (i > start) {
+          //BEGIN HORIZONTAL DIFFUSION hT multiplied
           RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
-        }
 
-        if (i < end - 1) {
           RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+          //END
+
+          double deltaZt = 0.;
+          double deltaZb = 0.;
+          double ht = 0.;
+          double hb = 0.;
+
+          if (k > 0) {
+            ht = (solh[k - 1] + solh[k]) / 2.;
+            deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+          }
+
+          else {
+            ht = solh[k];
+            deltaZt = 0.* (0. - solHT[k]) / ht;
+          }
+
+          if (k < NLayers - 1) {
+            hb = (solh[k] + solh[k + 1]) / 2.;
+            deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+          }
+
+          else {
+            hb = solh[k];
+            deltaZb = 0.* (solHT[k] - 0.) / hb;
+          }
+
+          RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+          double valueK1 = RHS * dt;
+          sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+          sol->_Sol[solIndexK1[k]]->close();
+
         }
 
-        //END
-
-        double deltaZt = 0.;
-        double deltaZb = 0.;
-        double ht = 0.;
-        double hb = 0.;
-
-        if (k > 0) {
-          ht = (solh[k - 1] + solh[k]) / 2.;
-          deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
-        }
-
-        else {
-          ht = solh[k];
-          deltaZt = 0.* (0. - solHT[k]) / ht;
-        }
-
-        if (k < NLayers - 1) {
-          hb = (solh[k] + solh[k + 1]) / 2.;
-          deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
-        }
-
-        else {
-          hb = solh[k];
-          deltaZb = 0.* (solHT[k] - 0.) / hb;
-        }
-
-        RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
-
-        double valueK1 = RHS * dt;
-        sol->_Sol[solIndexK1[k]]->set (i, valueK1);
-        sol->_Sol[solIndexK1[k]]->close();
+        //END layer loop
 
       }
-
-      //END layer loop
 
     }
 
@@ -5186,114 +5191,106 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
     for (unsigned k = 0; k < NumberOfLayers; k++) {
       for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
 
-        double h = (*sol->_Sol[solIndexh[k]]) (i);
-        double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+        short unsigned ielGroup = msh->GetElementGroup (i);
+        if (ielGroup == 2 || ielGroup == 3) { //interface 1 and interface 2
 
-        double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
-        double valueh = (*sol->_Sol[solIndexh[k]]) (i);
+          double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
 
-        double valueHT1st = HTold + K1 ;
+          double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
 
-        sol->_Sol[solIndexHT1st[k]]->set (i, valueHT1st);
+          double valueHT1st = HTold + K1 ;
 
-        sol->_Sol[solIndexHT1st[k]]->close();
+          sol->_Sol[solIndexHT1st[k]]->set (i, valueHT1st);
 
+          sol->_Sol[solIndexHT1st[k]]->close();
+
+        }
       }
     }
 
     //END UPDATE SOL
 
-    //END FIRST STAGE
+    //END FIRST STEP OF FIRST STAGE
 
     //--------------------------------------------------------------------------------------------------------------------------//
 
-
-    //BEGIN SECOND STAGE
+    //BEGIN SECOND STEP OF FIRST STAGE
 
     //BEGIN i loop
     for (unsigned i =  start; i <  end; i++) {
 
-      for (unsigned j = 0; j < NLayers; j++) {
+      short unsigned ielGroup = msh->GetElementGroup (i);
 
-        solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
-        solHT[j] = (*sol->_Sol[solIndexHT1st[j]]) (i);
+      if (ielGroup == 2 || ielGroup == 3) { //interface 1 and interface 2
 
-        solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
-        solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+        for (unsigned j = 0; j < NLayers; j++) {
 
-        if (i > start) {
+          solh[j] = (*sol->_SolOld[solIndexh[j]]) (i);
+          solHT[j] = (*sol->_Sol[solIndexHT1st[j]]) (i);
 
-          solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+          solvm[j] = (*sol->_SolOld[solIndexv[j]]) (i);
+          solvp[j] = (*sol->_SolOld[solIndexv[j]]) (i + 1);
 
+          solhm[j] = (*sol->_SolOld[solIndexh[j]]) (i - 1);
           solHTm[j] = (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
 
-        }
-
-        if (i < end - 1) {
-
-          short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
-
-          solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
-
+          solhp[j] = (*sol->_SolOld[solIndexh[j]]) (i + 1);
           solHTp[j] = (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
 
         }
 
-      }
+        vector < double > x (2);   // local coordinates
 
-      vector < double > x (2);   // local coordinates
-
-      for (unsigned j = 0; j < 2; j++) {
-        unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
-        x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
-      }
-
-      double dx = fabs (x[1] - x[0]);
-
-      std::vector < double > w (NLayers + 1, 0.);
-
-      std::vector < double > zTop (NLayers);
-      zTop[0] = 0;
-
-      for (unsigned k = 1; k < NLayers; k++) {
-        zTop[k] = zTop[k - 1] - solh[k];
-      }
-
-      std::vector < double > psi2 (NLayers);
-
-      for (unsigned k = 0; k < NLayers; k++) {
-        //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
-        psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
-      }
-
-      double xmid = 0.5 * (x[1] + x[0]);
-
-      for (unsigned k = NLayers; k > 1; k--) {
-        w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
-        //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
-
-        //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
-        //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
-        if (maxW[k - 1] < w[k - 1]) {
-          maxW[k - 1] = w[k - 1];
+        for (unsigned j = 0; j < 2; j++) {
+          unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+          x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
         }
-      }
+
+        double dx = fabs (x[1] - x[0]);
+
+        std::vector < double > w (NLayers + 1, 0.);
+
+        std::vector < double > zTop (NLayers);
+        zTop[0] = 0;
+
+        for (unsigned k = 1; k < NLayers; k++) {
+          zTop[k] = zTop[k - 1] - solh[k];
+        }
+
+        std::vector < double > psi2 (NLayers);
+
+        for (unsigned k = 0; k < NLayers; k++) {
+          //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+          psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+        }
+
+        double xmid = 0.5 * (x[1] + x[0]);
+
+        for (unsigned k = NLayers; k > 1; k--) {
+          w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+          //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+          //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+          //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+          if (maxW[k - 1] < w[k - 1]) {
+            maxW[k - 1] = w[k - 1];
+          }
+        }
 
 
-      for (unsigned k = 0; k < NLayers; k++) {
-        double RHS = 0.;
+        for (unsigned k = 0; k < NLayers; k++) {
+          double RHS = 0.;
 
-        //BEGIN HORIZONTAL ADVECTION
-        //BEGIN CENTRAL DIFF hT multiplied
+          //BEGIN HORIZONTAL ADVECTION
+          //BEGIN CENTRAL DIFF hT multiplied
 //                         if ( i > start ) {
 //                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
 //                         }
 //                         if ( i < end - 1 ) {
 //                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
 //                         }
-        //END
-        //BEGIN FIRST ORDER UPWINDING hT multiplied
-        if (i > start) {
+          //END
+          //BEGIN FIRST ORDER UPWINDING hT multiplied
           if (solvm[k] > 0) {
             RHS += solHTm[k] * solvm[k] / dx;
           }
@@ -5301,9 +5298,7 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
           else {
             RHS += solHT[k] * solvm[k] / dx;
           }
-        }
 
-        if (i < end - 1) {
           if (solvp[k] > 0) {
             RHS -= solHT[k] * solvp[k] / dx;
           }
@@ -5311,90 +5306,1160 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
           else {
             RHS -= solHTp[k] * solvp[k] / dx;
           }
-        }
+          //END
+          //END HORIZONTAL ADVECTION
 
-        //END
-        //END HORIZONTAL ADVECTION
-
-
-
-        //BEGIN VERTICAL ADVECTION
-        //BEGIN CENTRAL DIFF hT multiplied
+          //BEGIN VERTICAL ADVECTION
+          //BEGIN CENTRAL DIFF hT multiplied
 //                 if ( k < NLayers - 1 ) {
 //                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
 //                 }
 //                 if ( k > 0 ) {
 //                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
 //                 }
-        //END
-        //BEGIN FIRST ORDER UPWIND hT multiplied
-        if (k < NLayers - 1) {
-          if (w[k + 1] > 0) {
-            RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+          //END
+          //BEGIN FIRST ORDER UPWIND hT multiplied
+          if (k < NLayers - 1) {
+            if (w[k + 1] > 0) {
+              RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+            }
+
+            else {
+              RHS += w[k + 1] * (solHT[k] / solh[k]);
+            }
           }
 
-          else {
-            RHS += w[k + 1] * (solHT[k] / solh[k]);
+          if (k > 0) {
+            if (w[k] > 0) {
+              RHS -= w[k] * (solHT[k] / solh[k]);
+            }
+
+            else {
+              RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+            }
           }
-        }
 
-        if (k > 0) {
-          if (w[k] > 0) {
-            RHS -= w[k] * (solHT[k] / solh[k]);
-          }
+          //END
+          //END VERTICAL ADVECTION
 
-          else {
-            RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
-          }
-        }
-
-        //END
-        //END VERTICAL ADVECTION
-
-        //BEGIN HORIZONTAL DIFFUSION hT multiplied
-        if (i > start) {
+          //BEGIN HORIZONTAL DIFFUSION hT multiplied
           RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
-        }
 
-        if (i < end - 1) {
           RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+          //END
+
+          double deltaZt = 0.;
+          double deltaZb = 0.;
+          double ht = 0.;
+          double hb = 0.;
+
+          if (k > 0) {
+            ht = (solh[k - 1] + solh[k]) / 2.;
+            deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+          }
+
+          else {
+            ht = solh[k];
+            deltaZt = 0.* (0. - solHT[k]) / ht;
+          }
+
+          if (k < NLayers - 1) {
+            hb = (solh[k] + solh[k + 1]) / 2.;
+            deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+          }
+
+          else {
+            hb = solh[k];
+            deltaZb = 0.* (solHT[k] - 0.) / hb;
+          }
+
+          RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+          double valueK1 = 0.25 * RHS * dt;
+          sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+          sol->_Sol[solIndexK1[k]]->close();
+
         }
 
-        //END
-
-        double deltaZt = 0.;
-        double deltaZb = 0.;
-        double ht = 0.;
-        double hb = 0.;
-
-        if (k > 0) {
-          ht = (solh[k - 1] + solh[k]) / 2.;
-          deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
-        }
-
-        else {
-          ht = solh[k];
-          deltaZt = 0.* (0. - solHT[k]) / ht;
-        }
-
-        if (k < NLayers - 1) {
-          hb = (solh[k] + solh[k + 1]) / 2.;
-          deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
-        }
-
-        else {
-          hb = solh[k];
-          deltaZb = 0.* (solHT[k] - 0.) / hb;
-        }
-
-        RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
-
-        double valueK1 = 0.5 * RHS * dt;
-        sol->_Sol[solIndexK1[k]]->set (i, valueK1);
-        sol->_Sol[solIndexK1[k]]->close();
+        //END layer loop
 
       }
-      //END layer loop
+
+    }
+
+    //END i loop
+
+    //BEGIN UPDATE SOL
+    for (unsigned k = 0; k < NumberOfLayers; k++) {
+      for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+        short unsigned ielGroup = msh->GetElementGroup (i);
+        if (ielGroup == 2 || ielGroup == 3) { //interface 1 and interface 2
+
+          double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+          double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+          double HT1st = (*sol->_Sol[solIndexHT1st[k]]) (i);
+
+          double valueHT2nd = 0.75 * HTold + 0.25 * HT1st + K1 ;
+
+          sol->_Sol[solIndexHT2nd[k]]->set (i, valueHT2nd);
+
+          sol->_Sol[solIndexHT2nd[k]]->close();
+
+        }
+      }
+    }
+
+    //END UPDATE SOL
+
+    //END SECOND STEP OF FIRST STAGE
+
+    //END FIRST STAGE (interface prediction)
+
+    //--------------------------------------------------------------------------------------------------------------------------//
+
+    //BEGIN SECOND STAGE (advancement of fine and coarse)
+
+    //BEGIN substepping
+    for (unsigned substep = 0; substep < M; substep++) { //for the fine elements
+
+      for (unsigned k = 0; k < NumberOfLayers; k++) {
+        for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+          short unsigned ielGroup = msh->GetElementGroup (i);
+
+          if (ielGroup == 1) { //fine
+
+            double valueHT = (*sol->_Sol[solIndexHT[k]]) (i);
+
+            sol->_Sol[solIndexF3rd[substep][k]]->set (i, valueHT);
+
+            sol->_Sol[solIndexF3rd[substep][k]]->close();
+
+          }
+        }
+      }
+
+      //BEGIN FIRST STEP OF SECOND STAGE
+
+      //BEGIN i loop
+      for (unsigned i =  start; i <  end; i++) {
+
+        short unsigned ielGroup = msh->GetElementGroup (i);
+
+        if (ielGroup == 1 || (ielGroup == 4 && substep == 0)) {  // fine or coarse
+
+          for (unsigned j = 0; j < NLayers; j++) {
+
+            solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+            solHT[j] = (*sol->_Sol[solIndexHT[j]]) (i);
+
+            solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+            solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+            if (ielGroup == 1) {
+
+              if (i > start) {
+
+                solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+                solHTm[j] = (*sol->_Sol[solIndexHT[j]]) (i - 1);
+
+              }
+
+              solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+              short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+              if (ielpGroup == 2) { //if element on the right is an interface 1 element
+                double alpha = static_cast<double> (substep)  / M;
+                double alphaHat = static_cast<double> (substep * substep) / (M * M);
+                solHTp[j] = (1. - alpha - alphaHat) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (alpha - alphaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i + 1)
+                            + 2. * alphaHat * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+              }
+
+              else {
+                solHTp[j] = (*sol->_Sol[solIndexHT[j]]) (i + 1);
+              }
+
+            }
+
+            else if (ielGroup == 4 && substep == 0) {
+
+              solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+              short unsigned ielmGroup = msh->GetElementGroup (i - 1); //NOTE this operation has to be dealt with in parallel
+
+              solHTm[j] = (*sol->_SolOld[solIndexHT[j]]) (i - 1);
+
+              if (i < end - 1) {
+
+                solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+                solHTp[j] = (*sol->_SolOld[solIndexHT[j]]) (i + 1);
+
+              }
+
+            }
+
+          }
+
+
+          vector < double > x (2);   // local coordinates
+
+          for (unsigned j = 0; j < 2; j++) {
+            unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+            x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+          }
+
+          double dx = fabs (x[1] - x[0]);
+
+          std::vector < double > w (NLayers + 1, 0.);
+
+          std::vector < double > zTop (NLayers);
+          zTop[0] = 0;
+
+          for (unsigned k = 1; k < NLayers; k++) {
+            zTop[k] = zTop[k - 1] - solh[k];
+          }
+
+          std::vector < double > psi2 (NLayers);
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+            psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+          }
+
+          double xmid = 0.5 * (x[1] + x[0]);
+
+          for (unsigned k = NLayers; k > 1; k--) {
+            w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+            //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+            //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+            //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+            if (maxW[k - 1] < w[k - 1]) {
+              maxW[k - 1] = w[k - 1];
+            }
+          }
+
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            double RHS = 0.;
+
+            //BEGIN HORIZONTAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+            //END
+            //BEGIN FIRST ORDER UPWINDING hT multiplied
+            if (i > start) {
+              if (solvm[k] > 0) {
+                RHS += solHTm[k] * solvm[k] / dx;
+              }
+
+              else {
+                RHS += solHT[k] * solvm[k] / dx;
+              }
+            }
+
+            if (solvp[k] > 0) {
+              RHS -= solHT[k] * solvp[k] / dx;
+            }
+
+            else {
+              RHS -= solHTp[k] * solvp[k] / dx;
+            }
+
+            //END
+            //END HORIZONTAL ADVECTION
+
+
+
+            //BEGIN VERTICAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+            //END
+            //BEGIN FIRST ORDER UPWIND hT multiplied
+            if (k < NLayers - 1) {
+              if (w[k + 1] > 0) {
+                RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+              }
+
+              else {
+                RHS += w[k + 1] * (solHT[k] / solh[k]);
+              }
+            }
+
+            if (k > 0) {
+              if (w[k] > 0) {
+                RHS -= w[k] * (solHT[k] / solh[k]);
+              }
+
+              else {
+                RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+              }
+            }
+
+            //END
+            //END VERTICAL ADVECTION
+
+            //BEGIN HORIZONTAL DIFFUSION hT multiplied
+            if (i > start) {
+              RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+            }
+
+            RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+            //END
+
+            double deltaZt = 0.;
+            double deltaZb = 0.;
+            double ht = 0.;
+            double hb = 0.;
+
+            if (k > 0) {
+              ht = (solh[k - 1] + solh[k]) / 2.;
+              deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+            }
+
+            else {
+              ht = solh[k];
+              deltaZt = 0.* (0. - solHT[k]) / ht;
+            }
+
+            if (k < NLayers - 1) {
+              hb = (solh[k] + solh[k + 1]) / 2.;
+              deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+            }
+
+            else {
+              hb = solh[k];
+              deltaZb = 0.* (solHT[k] - 0.) / hb;
+            }
+
+            RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+            double valueK1;
+            if (ielGroup == 1) valueK1 = RHS * dt / M;
+            else if (ielGroup == 4 && substep == 0) valueK1 = RHS * dt;
+            sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+            sol->_Sol[solIndexK1[k]]->close();
+
+          }
+          //END layer loop
+
+        }
+        //END if on group
+
+      }
+      //END i loop
+
+      //BEGIN UPDATE SOL
+      for (unsigned k = 0; k < NumberOfLayers; k++) {
+        for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+          short unsigned ielGroup = msh->GetElementGroup (i);
+
+          if (ielGroup == 1) { //fine
+
+            double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+            double HTpreviousStep = (*sol->_Sol[solIndexHT[k]]) (i);
+
+            double valueHT1st = HTpreviousStep + K1 ;
+
+            sol->_Sol[solIndexHT1st[k]]->set (i, valueHT1st);
+            sol->_Sol[solIndexF1st[substep][k]]->set (i, valueHT1st);
+
+            sol->_Sol[solIndexHT1st[k]]->close();
+            sol->_Sol[solIndexF1st[substep][k]]->close();
+
+          }
+
+          else  if (ielGroup == 4 && substep == 0) { //coarse
+
+            double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+            double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+
+            double valueHT1st = HTold + K1 ;
+
+            sol->_Sol[solIndexHT1st[k]]->set (i, valueHT1st);
+
+            sol->_Sol[solIndexHT1st[k]]->close();
+
+          }
+
+        }
+      }
+      //END UPDATE SOL
+
+      //END FIRST STEP OF SECOND STAGE
+
+//--------------------------------------------------------------------------------------------------------------------------//
+
+      //BEGIN SECOND STEP OF SECOND STAGE
+
+      //BEGIN i loop
+      for (unsigned i =  start; i <  end; i++) {
+
+        short unsigned ielGroup = msh->GetElementGroup (i);
+
+        if (ielGroup == 1 || (ielGroup == 4 && substep == 0)) { // fine or coarse
+
+          for (unsigned j = 0; j < NLayers; j++) {
+
+            solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+            solHT[j] = (*sol->_Sol[solIndexHT1st[j]]) (i);
+
+            solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+            solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+            if (ielGroup == 1) {
+
+              if (i > start) {
+
+                solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+                solHTm[j] = (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+
+              }
+
+              solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+              short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+              if (ielpGroup == 2) { //if element on the right is an interface 1 element
+                double beta =  static_cast<double> (substep + 1.) / M;
+                double betaHat = static_cast<double> (substep * substep + 2. * substep) / (M * M);
+                solHTp[j] = (1. - beta - betaHat) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (beta - betaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i + 1)
+                            + 2. * betaHat * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+              }
+
+              else {
+                solHTp[j] = (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+              }
+
+            }
+
+            else if (ielGroup == 4 && substep == 0) {
+
+              solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+              solHTm[j] = (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+
+              if (i < end - 1) {
+
+                solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+                solHTp[j] = (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+
+              }
+
+            }
+
+          }
+
+          vector < double > x (2);   // local coordinates
+
+          for (unsigned j = 0; j < 2; j++) {
+            unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+            x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+          }
+
+          double dx = fabs (x[1] - x[0]);
+
+          std::vector < double > w (NLayers + 1, 0.);
+
+          std::vector < double > zTop (NLayers);
+          zTop[0] = 0;
+
+          for (unsigned k = 1; k < NLayers; k++) {
+            zTop[k] = zTop[k - 1] - solh[k];
+          }
+
+          std::vector < double > psi2 (NLayers);
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+            psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+          }
+
+          double xmid = 0.5 * (x[1] + x[0]);
+
+          for (unsigned k = NLayers; k > 1; k--) {
+            w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+            //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+            //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+            //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+            if (maxW[k - 1] < w[k - 1]) {
+              maxW[k - 1] = w[k - 1];
+            }
+          }
+
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            double RHS = 0.;
+
+            //BEGIN HORIZONTAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+            //END
+            //BEGIN FIRST ORDER UPWINDING hT multiplied
+            if (i > start) {
+              if (solvm[k] > 0) {
+                RHS += solHTm[k] * solvm[k] / dx;
+              }
+
+              else {
+                RHS += solHT[k] * solvm[k] / dx;
+              }
+            }
+
+            if (solvp[k] > 0) {
+              RHS -= solHT[k] * solvp[k] / dx;
+            }
+
+            else {
+              RHS -= solHTp[k] * solvp[k] / dx;
+            }
+            //END
+            //END HORIZONTAL ADVECTION
+
+
+
+            //BEGIN VERTICAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+            //END
+            //BEGIN FIRST ORDER UPWIND hT multiplied
+            if (k < NLayers - 1) {
+              if (w[k + 1] > 0) {
+                RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+              }
+
+              else {
+                RHS += w[k + 1] * (solHT[k] / solh[k]);
+              }
+            }
+
+            if (k > 0) {
+              if (w[k] > 0) {
+                RHS -= w[k] * (solHT[k] / solh[k]);
+              }
+
+              else {
+                RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+              }
+            }
+
+            //END
+            //END VERTICAL ADVECTION
+
+            //BEGIN HORIZONTAL DIFFUSION hT multiplied
+            if (i > start) {
+              RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+            }
+
+            RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+            //END
+
+            double deltaZt = 0.;
+            double deltaZb = 0.;
+            double ht = 0.;
+            double hb = 0.;
+
+            if (k > 0) {
+              ht = (solh[k - 1] + solh[k]) / 2.;
+              deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+            }
+
+            else {
+              ht = solh[k];
+              deltaZt = 0.* (0. - solHT[k]) / ht;
+            }
+
+            if (k < NLayers - 1) {
+              hb = (solh[k] + solh[k + 1]) / 2.;
+              deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+            }
+
+            else {
+              hb = solh[k];
+              deltaZb = 0.* (solHT[k] - 0.) / hb;
+            }
+
+            RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+            double valueK1;
+            if (ielGroup == 1) valueK1 = 0.25 * RHS * dt / M;
+            else if (ielGroup == 4 && substep == 0) valueK1 = 0.25 * RHS * dt;
+            sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+            sol->_Sol[solIndexK1[k]]->close();
+
+          }
+          //END layer loop
+
+        }
+        //END if on group
+
+      }
+      //END i loop
+
+      //BEGIN UPDATE SOL
+      for (unsigned k = 0; k < NumberOfLayers; k++) {
+        for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+          short unsigned ielGroup = msh->GetElementGroup (i);
+
+          if (ielGroup == 1) { //fine
+
+            double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+            double HTpreviousStep = (*sol->_Sol[solIndexHT[k]]) (i);
+            double HT1st = (*sol->_Sol[solIndexHT1st[k]]) (i);
+
+            double valueHT2nd = 0.75 * HTpreviousStep + 0.25 * HT1st + K1 ;
+
+            sol->_Sol[solIndexHT2nd[k]]->set (i, valueHT2nd);
+            sol->_Sol[solIndexF2nd[substep][k]]->set (i, valueHT2nd);
+
+            sol->_Sol[solIndexHT2nd[k]]->close();
+            sol->_Sol[solIndexF2nd[substep][k]]->close();
+
+          }
+
+          else if (ielGroup == 4 && substep == 0) { //coarse
+
+            double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+            double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+            double HT1st = (*sol->_Sol[solIndexHT1st[k]]) (i);
+
+            double valueHT2nd = 0.75 * HTold + 0.25 * HT1st + K1 ;
+
+            sol->_Sol[solIndexHT2nd[k]]->set (i, valueHT2nd);
+
+            sol->_Sol[solIndexHT2nd[k]]->close();
+
+          }
+
+        }
+      }
+
+      //END UPDATE SOL
+
+      //END SECOND STEP OF SECOND STAGE
+
+      //--------------------------------------------------------------------------------------------------------------------------//
+
+      //BEGIN THIRD STEP OF SECOND STAGE
+
+      //BEGIN i loop
+      for (unsigned i =  start; i <  end; i++) {
+
+        short unsigned ielGroup = msh->GetElementGroup (i);
+
+        if (ielGroup == 1 || (ielGroup == 4 && substep == 0)) { // fine or coarse
+
+          for (unsigned j = 0; j < NLayers; j++) {
+
+            solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+            solHT[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i);
+
+            solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+            solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+            if (ielGroup == 1) {
+
+              if (i > start) {
+
+                solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+                solHTm[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i - 1);
+
+              }
+
+              solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+              short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+              if (ielpGroup == 2) { //if element on the right is an interface 1 element
+                double gamma =  static_cast<double> (2. * substep + 1.) / (2 * M);
+                double gammaHat = static_cast<double> (2. * substep * substep + 2. * substep + 1.) / (2 * M * M);
+                solHTp[j] = (1. - gamma - gammaHat) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (gamma - gammaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i + 1)
+                            + 2. * gammaHat * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+              }
+
+              else {
+                solHTp[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i + 1);
+              }
+
+            }
+
+            else if (ielGroup == 4 && substep == 0) {
+
+              solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+              solHTm[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i - 1);
+
+              if (i < end - 1) {
+
+                solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+                solHTp[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i + 1);
+
+              }
+
+            }
+
+          }
+
+          vector < double > x (2);   // local coordinates
+
+          for (unsigned j = 0; j < 2; j++) {
+            unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+            x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+          }
+
+          double dx = fabs (x[1] - x[0]);
+
+          std::vector < double > w (NLayers + 1, 0.);
+
+          std::vector < double > zTop (NLayers);
+          zTop[0] = 0;
+
+          for (unsigned k = 1; k < NLayers; k++) {
+            zTop[k] = zTop[k - 1] - solh[k];
+          }
+
+          std::vector < double > psi2 (NLayers);
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+            psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+          }
+
+          double xmid = 0.5 * (x[1] + x[0]);
+
+          for (unsigned k = NLayers; k > 1; k--) {
+            w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+            //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+            //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+            //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+            if (maxW[k - 1] < w[k - 1]) {
+              maxW[k - 1] = w[k - 1];
+            }
+          }
+
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            double RHS = 0.;
+
+            //BEGIN HORIZONTAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+            //END
+            //BEGIN FIRST ORDER UPWINDING hT multiplied
+            if (i > start) {
+              if (solvm[k] > 0) {
+                RHS += solHTm[k] * solvm[k] / dx;
+              }
+
+              else {
+                RHS += solHT[k] * solvm[k] / dx;
+              }
+            }
+
+            if (solvp[k] > 0) {
+              RHS -= solHT[k] * solvp[k] / dx;
+            }
+
+            else {
+              RHS -= solHTp[k] * solvp[k] / dx;
+            }
+            //END
+            //END HORIZONTAL ADVECTION
+
+
+
+            //BEGIN VERTICAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+            //END
+            //BEGIN FIRST ORDER UPWIND hT multiplied
+            if (k < NLayers - 1) {
+              if (w[k + 1] > 0) {
+                RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+              }
+
+              else {
+                RHS += w[k + 1] * (solHT[k] / solh[k]);
+              }
+            }
+
+            if (k > 0) {
+              if (w[k] > 0) {
+                RHS -= w[k] * (solHT[k] / solh[k]);
+              }
+
+              else {
+                RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+              }
+            }
+
+            //END
+            //END VERTICAL ADVECTION
+
+            //BEGIN HORIZONTAL DIFFUSION hT multiplied
+            if (i > start) {
+              RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+            }
+
+            RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+            //END
+
+            double deltaZt = 0.;
+            double deltaZb = 0.;
+            double ht = 0.;
+            double hb = 0.;
+
+            if (k > 0) {
+              ht = (solh[k - 1] + solh[k]) / 2.;
+              deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+            }
+
+            else {
+              ht = solh[k];
+              deltaZt = 0.* (0. - solHT[k]) / ht;
+            }
+
+            if (k < NLayers - 1) {
+              hb = (solh[k] + solh[k + 1]) / 2.;
+              deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+            }
+
+            else {
+              hb = solh[k];
+              deltaZb = 0.* (solHT[k] - 0.) / hb;
+            }
+
+            RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+            double valueK1;
+            if (ielGroup == 1) valueK1 = (2. / 3.) * RHS * dt / M;
+            else if (ielGroup == 4 && substep == 0) valueK1 = (2. / 3.) * RHS * dt;
+            sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+            sol->_Sol[solIndexK1[k]]->close();
+
+          }
+          //END layer loop
+
+        }
+        //END if on group
+
+      }
+      //END i loop
+
+      //BEGIN UPDATE SOL
+      for (unsigned k = 0; k < NumberOfLayers; k++) {
+        for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+          short unsigned ielGroup = msh->GetElementGroup (i);
+
+          if (ielGroup == 1) { //fine
+
+            double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+            double HTpreviousStep = (*sol->_Sol[solIndexHT[k]]) (i);
+            double HT2nd = (*sol->_Sol[solIndexHT2nd[k]]) (i);
+
+            double valueHT = (1. / 3.) * HTpreviousStep + (2. / 3.) * HT2nd + K1 ;
+
+            sol->_Sol[solIndexHT[k]]->set (i, valueHT);
+
+            sol->_Sol[solIndexHT[k]]->close();
+
+          }
+
+          else if (ielGroup == 4 && substep == 0) { //coarse
+
+            double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+            double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+            double HT2nd = (*sol->_Sol[solIndexHT2nd[k]]) (i);
+
+            double valueHT = (1. / 3.) * HTold + (2. / 3.) * HT2nd + K1 ;
+
+            sol->_Sol[solIndexHT[k]]->set (i, valueHT);
+
+            sol->_Sol[solIndexHT[k]]->close();
+
+          }
+
+        }
+      }
+
+      //END UPDATE SOL
+
+      //END THIRD STEP OF SECOND STAGE
+
+    }
+    //END substepping
+
+    //--------------------------------------------------------------------------------------------------------------------------//
+
+    //BEGIN THIRD STAGE (interface correction)
+
+    //BEGIN FIRST STEP OF THIRD STAGE (interface 1 and interface 2)
+
+    //BEGIN i loop
+
+    for (unsigned k = 0; k < NLayers; k++) {
+      sol->_Sol[solIndexK1[k]]->zero();
+    }
+
+    for (unsigned i =  start; i <  end; i++) {
+
+      short unsigned ielGroup = msh->GetElementGroup (i);
+
+      if (ielGroup == 2 || ielGroup == 3) { // interface 1 and interface 2
+
+        for (unsigned substep = 0; substep < M ; substep++) {
+
+          for (unsigned j = 0; j < NLayers; j++) {
+
+            solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+            if (ielGroup == 2) {
+              double alpha = static_cast<double> (substep)  / M;
+              double alphaHat = static_cast<double> (substep * substep) / (M * M);
+              solHT[j] = (1. - alpha - alphaHat) * (*sol->_SolOld[solIndexHT[j]]) (i) + (alpha - alphaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i)
+                         + 2. * alphaHat * (*sol->_Sol[solIndexHT1st[j]]) (i);
+            }
+            if (ielGroup == 3) {
+              solHT[j] = (*sol->_SolOld[solIndexHT[j]]) (i);
+            }
+            solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+            solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+
+            short unsigned ielmGroup = msh->GetElementGroup (i - 1); //NOTE this operation has to be dealt with in parallel
+
+            solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+            if (ielmGroup == 2) {
+              double alpha = static_cast<double> (substep)  / M;
+              double alphaHat = static_cast<double> (substep * substep) / (M * M);
+              solHTm[j] = (1. - alpha - alphaHat) * (*sol->_SolOld[solIndexHT[j]]) (i - 1) + (alpha - alphaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i - 1)
+                          + 2. * alphaHat * (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+            }
+
+            else if (ielmGroup == 3) {
+              solHTm[j] = (*sol->_SolOld[solIndexHT[j]]) (i - 1);
+            }
+
+            else { //group 1
+              solHTm[j] = (*sol->_Sol[solIndexF3rd[substep][j]]) (i - 1);
+            }
+
+            short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+            solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+            if (ielpGroup == 2) {
+              double alpha = static_cast<double> (substep)  / M;
+              double alphaHat = static_cast<double> (substep * substep) / (M * M);
+              solHTp[j] = (1. - alpha - alphaHat) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (alpha - alphaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i + 1)
+                          + 2. * alphaHat * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+            }
+
+            else {
+              solHTp[j] = (*sol->_SolOld[solIndexHT[j]]) (i + 1); //this would be in interface 2 (group 3) or in coarse (group 4)
+            }
+
+          }
+
+          vector < double > x (2);   // local coordinates
+
+          for (unsigned j = 0; j < 2; j++) {
+            unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+            x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+          }
+
+          double dx = fabs (x[1] - x[0]);
+
+          std::vector < double > w (NLayers + 1, 0.);
+
+          std::vector < double > zTop (NLayers);
+          zTop[0] = 0;
+
+          for (unsigned k = 1; k < NLayers; k++) {
+            zTop[k] = zTop[k - 1] - solh[k];
+          }
+
+          std::vector < double > psi2 (NLayers);
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+            psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+          }
+
+          double xmid = 0.5 * (x[1] + x[0]);
+
+          for (unsigned k = NLayers; k > 1; k--) {
+            w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+            //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+            //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+            //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+            if (maxW[k - 1] < w[k - 1]) {
+              maxW[k - 1] = w[k - 1];
+            }
+          }
+
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            double RHS = 0.;
+
+            //BEGIN HORIZONTAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+            //END
+            //BEGIN FIRST ORDER UPWINDING hT multiplied
+            if (solvm[k] > 0) {
+              RHS += solHTm[k] * solvm[k] / dx;
+            }
+
+            else {
+              RHS += solHT[k] * solvm[k] / dx;
+            }
+
+            if (solvp[k] > 0) {
+              RHS -= solHT[k] * solvp[k] / dx;
+            }
+
+            else {
+              RHS -= solHTp[k] * solvp[k] / dx;
+            }
+            //END
+            //END HORIZONTAL ADVECTION
+
+
+
+            //BEGIN VERTICAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+            //END
+            //BEGIN FIRST ORDER UPWIND hT multiplied
+            if (k < NLayers - 1) {
+              if (w[k + 1] > 0) {
+                RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+              }
+
+              else {
+                RHS += w[k + 1] * (solHT[k] / solh[k]);
+              }
+            }
+
+            if (k > 0) {
+              if (w[k] > 0) {
+                RHS -= w[k] * (solHT[k] / solh[k]);
+              }
+
+              else {
+                RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+              }
+            }
+            //END
+            //END VERTICAL ADVECTION
+
+            //BEGIN HORIZONTAL DIFFUSION hT multiplied
+            RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+
+            RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+            //END
+
+            double deltaZt = 0.;
+            double deltaZb = 0.;
+            double ht = 0.;
+            double hb = 0.;
+
+            if (k > 0) {
+              ht = (solh[k - 1] + solh[k]) / 2.;
+              deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+            }
+
+            else {
+              ht = solh[k];
+              deltaZt = 0.* (0. - solHT[k]) / ht;
+            }
+
+            if (k < NLayers - 1) {
+              hb = (solh[k] + solh[k + 1]) / 2.;
+              deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+            }
+
+            else {
+              hb = solh[k];
+              deltaZb = 0.* (solHT[k] - 0.) / hb;
+            }
+
+            RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+            double valueK1 = RHS * dt / M;
+            sol->_Sol[solIndexK1[k]]->add (i, valueK1);
+            sol->_Sol[solIndexK1[k]]->close();
+
+          }
+          //END layer loop
+
+        }
+        //END substepping
+
+      }
+      //END if on group
 
     }
     //END i loop
@@ -5403,30 +6468,535 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
     for (unsigned k = 0; k < NumberOfLayers; k++) {
       for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
 
-        double h = (*sol->_Sol[solIndexh[k]]) (i);
-        double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+        short unsigned ielGroup = msh->GetElementGroup (i);
 
-        double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
-        double HT1stStage = (*sol->_Sol[solIndexHT1st[k]]) (i);
+        if (ielGroup == 2 || ielGroup == 3) { //interface 1 and interface 2
 
-        double valueHT = 0.5 * HTold + 0.5 * HT1stStage + K1 ;
+          double h = (*sol->_Sol[solIndexh[k]]) (i);
+          double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
 
-        sol->_Sol[solIndexHT[k]]->set (i, valueHT);
+          double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
 
-        sol->_Sol[solIndexHT[k]]->close();
+          double valueHTtilde = HTold + K1 ;
 
+          sol->_Sol[solIndexK2[k]]->set (i, valueHTtilde);
+
+          sol->_Sol[solIndexK2[k]]->close();
+
+        }
       }
     }
 
     //END UPDATE SOL
 
-    //END SECOND STAGE
+    //END FIRST STEP OF THIRD STAGE
 
-    //END SSP_RK
+//--------------------------------------------------------------------------------------------------------------------------//
+
+    //BEGIN SECOND STEP OF THIRD STAGE (interface 1 and interface 2)
+
+    //BEGIN i loop
+
+    for (unsigned k = 0; k < NLayers; k++) {
+      sol->_Sol[solIndexK1[k]]->zero();
+    }
+
+    for (unsigned i =  start; i <  end; i++) {
+
+      short unsigned ielGroup = msh->GetElementGroup (i);
+
+      if (ielGroup == 2 || ielGroup == 3) { // interface 1 and interface 2
+
+        for (unsigned substep = 0; substep < M ; substep++) {
+
+          for (unsigned j = 0; j < NLayers; j++) {
+
+            solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+            if (ielGroup == 2) {
+              double beta =  static_cast<double> (substep + 1.) / M;
+              double betaHat = static_cast<double> (substep * substep + 2. * substep) / (M * M);
+              solHT[j] = (1. - beta - betaHat) * (*sol->_SolOld[solIndexHT[j]]) (i) + (beta - betaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i)
+                         + 2. * betaHat * (*sol->_Sol[solIndexHT1st[j]]) (i);
+            }
+
+            if (ielGroup == 3) {
+              solHT[j] = (*sol->_Sol[solIndexHT1st[j]]) (i);
+            }
+
+            solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+            solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+            short unsigned ielmGroup = msh->GetElementGroup (i - 1); //NOTE this operation has to be dealt with in parallel
+
+            solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+            if (ielmGroup == 2) {
+              double beta =  static_cast<double> (substep + 1.) / M;
+              double betaHat = static_cast<double> (substep * substep + 2. * substep) / (M * M);
+              solHTm[j] = (1. - beta - betaHat) * (*sol->_SolOld[solIndexHT[j]]) (i - 1) + (beta - betaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i - 1)
+                          + 2. * betaHat * (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+            }
+
+            else if (ielmGroup == 3) {
+              solHTm[j] = (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+            }
+
+            else { // group 1
+              solHTm[j] = (*sol->_Sol[solIndexF1st[substep][j]]) (i - 1);
+            }
+
+            short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+            solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+            if (ielpGroup == 2) {
+              double beta =  static_cast<double> (substep + 1.) / M;
+              double betaHat = static_cast<double> (substep * substep + 2. * substep) / (M * M);
+              solHTp[j] = (1. - beta - betaHat) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (beta - betaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i + 1)
+                          + 2. * betaHat * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+            }
+
+            else {
+              solHTp[j] = (*sol->_Sol[solIndexHT1st[j]]) (i + 1); //this would be in interface 2 (group 3) or in coarse (group 4)
+            }
+
+          }
+
+          vector < double > x (2);   // local coordinates
+
+          for (unsigned j = 0; j < 2; j++) {
+            unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+            x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+          }
+
+          double dx = fabs (x[1] - x[0]);
+
+          std::vector < double > w (NLayers + 1, 0.);
+
+          std::vector < double > zTop (NLayers);
+          zTop[0] = 0;
+
+          for (unsigned k = 1; k < NLayers; k++) {
+            zTop[k] = zTop[k - 1] - solh[k];
+          }
+
+          std::vector < double > psi2 (NLayers);
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+            psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+          }
+
+          double xmid = 0.5 * (x[1] + x[0]);
+
+          for (unsigned k = NLayers; k > 1; k--) {
+            w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+            //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+            //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+            //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+            if (maxW[k - 1] < w[k - 1]) {
+              maxW[k - 1] = w[k - 1];
+            }
+          }
+
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            double RHS = 0.;
+
+            //BEGIN HORIZONTAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+            //END
+            //BEGIN FIRST ORDER UPWINDING hT multiplied
+            if (solvm[k] > 0) {
+              RHS += solHTm[k] * solvm[k] / dx;
+            }
+
+            else {
+              RHS += solHT[k] * solvm[k] / dx;
+            }
+
+            if (solvp[k] > 0) {
+              RHS -= solHT[k] * solvp[k] / dx;
+            }
+
+            else {
+              RHS -= solHTp[k] * solvp[k] / dx;
+            }
+            //END
+            //END HORIZONTAL ADVECTION
+
+
+            //BEGIN VERTICAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+            //END
+            //BEGIN FIRST ORDER UPWIND hT multiplied
+            if (k < NLayers - 1) {
+              if (w[k + 1] > 0) {
+                RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+              }
+
+              else {
+                RHS += w[k + 1] * (solHT[k] / solh[k]);
+              }
+            }
+
+            if (k > 0) {
+              if (w[k] > 0) {
+                RHS -= w[k] * (solHT[k] / solh[k]);
+              }
+
+              else {
+                RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+              }
+            }
+
+            //END
+            //END VERTICAL ADVECTION
+
+            //BEGIN HORIZONTAL DIFFUSION hT multiplied
+            RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+
+            RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+            //END
+
+            double deltaZt = 0.;
+            double deltaZb = 0.;
+            double ht = 0.;
+            double hb = 0.;
+
+            if (k > 0) {
+              ht = (solh[k - 1] + solh[k]) / 2.;
+              deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+            }
+
+            else {
+              ht = solh[k];
+              deltaZt = 0.* (0. - solHT[k]) / ht;
+            }
+
+            if (k < NLayers - 1) {
+              hb = (solh[k] + solh[k + 1]) / 2.;
+              deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+            }
+
+            else {
+              hb = solh[k];
+              deltaZb = 0.* (solHT[k] - 0.) / hb;
+            }
+
+            RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+            double valueK1 = 0.25 * RHS * dt / M;
+            sol->_Sol[solIndexK1[k]]->add (i, valueK1);
+            sol->_Sol[solIndexK1[k]]->close();
+
+          }
+          //END layer loop
+
+        }
+        //END substepping
+
+      }
+      //END if on group
+
+    }
+    //END i loop
+
+    //BEGIN UPDATE SOL
+    for (unsigned k = 0; k < NumberOfLayers; k++) {
+      for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+        short unsigned ielGroup = msh->GetElementGroup (i);
+
+        if (ielGroup == 2 || ielGroup == 3) { //interface 1 and interface 2
+
+          double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+          double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+          double HTtilde = (*sol->_Sol[solIndexK2[k]]) (i);
+
+          double HTtildeHalf = 0.75 * HTold + 0.25 * HTtilde + K1 ;
+
+          sol->_Sol[solIndexK2[k]]->set (i, HTtildeHalf);
+
+          sol->_Sol[solIndexK2[k]]->close();
+
+        }
+      }
+    }
+
+    //END UPDATE SOL
+
+    //END SECOND STEP OF THIRD STAGE
 
     //--------------------------------------------------------------------------------------------------------------------------//
 
-//BEGIN SET AND PRINT T
+    //BEGIN THIRD STEP OF THIRD STAGE
+
+    for (unsigned k = 0; k < NLayers; k++) {
+      sol->_Sol[solIndexK1[k]]->zero();
+    }
+
+    for (unsigned i =  start; i <  end; i++) {
+
+      short unsigned ielGroup = msh->GetElementGroup (i);
+
+      if (ielGroup == 2 || ielGroup == 3) { // interface 1 and interface 2
+
+        for (unsigned substep = 0; substep < M ; substep++) {
+
+          for (unsigned j = 0; j < NLayers; j++) {
+
+            solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+            if (ielGroup == 2) {
+              double gamma =  static_cast<double> (2. * substep + 1.) / (2 * M);
+              double gammaHat = static_cast<double> (2. * substep * substep + 2. * substep + 1.) / (2 * M * M);
+              solHT[j] = (1. - gamma - gammaHat) * (*sol->_SolOld[solIndexHT[j]]) (i) + (gamma - gammaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i)
+                         + 2. * gammaHat * (*sol->_Sol[solIndexHT1st[j]]) (i);
+            }
+
+            if (ielGroup == 3) {
+              solHT[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i);
+            }
+
+            solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+            solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+            short unsigned ielmGroup = msh->GetElementGroup (i - 1); //NOTE this operation has to be dealt with in parallel
+
+            solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+            if (ielmGroup == 2) {
+              double gamma =  static_cast<double> (2. * substep + 1.) / (2 * M);
+              double gammaHat = static_cast<double> (2. * substep * substep + 2. * substep + 1.) / (2 * M * M);
+              solHTm[j] = (1. - gamma - gammaHat) * (*sol->_SolOld[solIndexHT[j]]) (i - 1) + (gamma - gammaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i - 1)
+                          + 2. * gammaHat * (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+            }
+
+            else if (ielmGroup == 3) {
+              solHTm[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i - 1);
+            }
+
+            else { // group 1
+              solHTm[j] = (*sol->_Sol[solIndexF2nd[substep][j]]) (i - 1);
+            }
+
+            short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+            solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+            if (ielpGroup == 2) {
+              double gamma =  static_cast<double> (2. * substep + 1.) / (2 * M);
+              double gammaHat = static_cast<double> (2. * substep * substep + 2. * substep + 1.) / (2 * M * M);
+              solHTp[j] = (1. - gamma - gammaHat) * (*sol->_SolOld[solIndexHT[j]]) (i + 1) + (gamma - gammaHat) * (*sol->_Sol[solIndexHT2nd[j]]) (i + 1)
+                          + 2. * gammaHat * (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+            }
+
+            else {
+              solHTp[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i + 1); //this would be in interface 2 (group 3) or in coarse (group 4)
+            }
+
+          }
+
+          vector < double > x (2);   // local coordinates
+
+          for (unsigned j = 0; j < 2; j++) {
+            unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+            x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+          }
+
+          double dx = fabs (x[1] - x[0]);
+
+          std::vector < double > w (NLayers + 1, 0.);
+
+          std::vector < double > zTop (NLayers);
+          zTop[0] = 0;
+
+          for (unsigned k = 1; k < NLayers; k++) {
+            zTop[k] = zTop[k - 1] - solh[k];
+          }
+
+          std::vector < double > psi2 (NLayers);
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+            psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+          }
+
+          double xmid = 0.5 * (x[1] + x[0]);
+
+          for (unsigned k = NLayers; k > 1; k--) {
+            w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+            //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+            //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+            //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+            if (maxW[k - 1] < w[k - 1]) {
+              maxW[k - 1] = w[k - 1];
+            }
+          }
+
+
+          for (unsigned k = 0; k < NLayers; k++) {
+            double RHS = 0.;
+
+            //BEGIN HORIZONTAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+            //END
+            //BEGIN FIRST ORDER UPWINDING hT multiplied
+            if (solvm[k] > 0) {
+              RHS += solHTm[k] * solvm[k] / dx;
+            }
+
+            else {
+              RHS += solHT[k] * solvm[k] / dx;
+            }
+
+            if (solvp[k] > 0) {
+              RHS -= solHT[k] * solvp[k] / dx;
+            }
+
+            else {
+              RHS -= solHTp[k] * solvp[k] / dx;
+            }
+            //END
+            //END HORIZONTAL ADVECTION
+
+
+            //BEGIN VERTICAL ADVECTION
+            //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+            //END
+            //BEGIN FIRST ORDER UPWIND hT multiplied
+            if (k < NLayers - 1) {
+              if (w[k + 1] > 0) {
+                RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+              }
+
+              else {
+                RHS += w[k + 1] * (solHT[k] / solh[k]);
+              }
+            }
+
+            if (k > 0) {
+              if (w[k] > 0) {
+                RHS -= w[k] * (solHT[k] / solh[k]);
+              }
+
+              else {
+                RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+              }
+            }
+
+            //END
+            //END VERTICAL ADVECTION
+
+            //BEGIN HORIZONTAL DIFFUSION hT multiplied
+            RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+
+            RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+            //END
+
+            double deltaZt = 0.;
+            double deltaZb = 0.;
+            double ht = 0.;
+            double hb = 0.;
+
+            if (k > 0) {
+              ht = (solh[k - 1] + solh[k]) / 2.;
+              deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+            }
+
+            else {
+              ht = solh[k];
+              deltaZt = 0.* (0. - solHT[k]) / ht;
+            }
+
+            if (k < NLayers - 1) {
+              hb = (solh[k] + solh[k + 1]) / 2.;
+              deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+            }
+
+            else {
+              hb = solh[k];
+              deltaZb = 0.* (solHT[k] - 0.) / hb;
+            }
+
+            RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+            double valueK1 = (2. / 3.) * RHS * dt / M;
+            sol->_Sol[solIndexK1[k]]->add (i, valueK1);
+            sol->_Sol[solIndexK1[k]]->close();
+
+          }
+          //END layer loop
+
+        }
+        //END substepping
+
+      }
+      //END if on group
+
+    }
+    //END i loop
+
+    //BEGIN UPDATE SOL
+    for (unsigned k = 0; k < NumberOfLayers; k++) {
+      for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+        short unsigned ielGroup = msh->GetElementGroup (i);
+
+        if (ielGroup == 2 || ielGroup == 3) { //interface 1 and interface 2
+
+          double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+          double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+          double HTtildeHalf = (*sol->_Sol[solIndexK2[k]]) (i);
+
+          double HTvalue = (1. / 3.) * HTold + (2. / 3.) * HTtildeHalf + K1 ;
+
+          sol->_Sol[solIndexHT[k]]->set (i, HTvalue);
+
+          sol->_Sol[solIndexHT[k]]->close();
+
+        }
+      }
+    }
+
+
+    //END THIRD STEP OF THIRD STAGE
+
+    //END THIRD STAGE (interface correction)
+
+    //END LTS
+
+    //--------------------------------------------------------------------------------------------------------------------------//
+
+    //BEGIN SET AND PRINT T
 
     for (unsigned k = 0; k < NumberOfLayers; k++) {
       for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
@@ -5451,6 +7021,790 @@ void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
     //END
 
   }
+
+
+}
+
+void SSP_RK (MultiLevelProblem& ml_prob, const unsigned & numberOfTimeSteps) {
+
+  const unsigned& NLayers = NumberOfLayers;
+
+  unsigned level = ml_prob._ml_msh->GetNumberOfLevels() - 1u;
+
+  Mesh* msh = ml_prob._ml_msh->GetLevel (level);
+  elem* el = msh->el;
+
+  MultiLevelSolution* mlSol = ml_prob._ml_sol;
+  Solution* sol = ml_prob._ml_sol->GetSolutionLevel (level);
+
+  const unsigned  dim = msh->GetDimension();
+
+  unsigned    iproc = msh->processor_id();
+  unsigned    nprocs = msh->n_processors();
+
+  std::vector < unsigned > solIndexh (NLayers);
+  std::vector < unsigned > solIndexv (NLayers);
+  std::vector < unsigned > solIndexHT (NLayers);
+  std::vector < unsigned > solIndexT (NLayers);
+  std::vector < unsigned > solIndexHT1st (NLayers);
+  std::vector < unsigned > solIndexHT2nd (NLayers);
+
+  std::vector < unsigned > solIndexK1 (NLayers); //auxiliary variable
+  std::vector < unsigned > solIndexK2 (NLayers); //auxiliary variable
+
+  for (unsigned i = 0; i < NLayers; i++) {
+
+    char name[10];
+    sprintf (name, "h%d", i);
+    solIndexh[i] = mlSol->GetIndex (name);
+
+    sprintf (name, "v%d", i);
+    solIndexv[i] = mlSol->GetIndex (name);
+
+    sprintf (name, "HT%d", i);
+    solIndexHT[i] = mlSol->GetIndex (name);
+
+    sprintf (name, "T%d", i);
+    solIndexT[i] = mlSol->GetIndex (name);
+
+    sprintf (name, "HT%d_1st", i);
+    solIndexHT1st[i] = mlSol->GetIndex (name);
+
+    sprintf (name, "HT%d_2nd", i);
+    solIndexHT2nd[i] = mlSol->GetIndex (name);
+
+    sprintf (name, "K1_%d", i);  //auxiliary soln
+    solIndexK1[i] = mlSol->GetIndex (name);
+
+  }
+
+  unsigned solTypeh = mlSol->GetSolutionType (solIndexh[0]);
+  unsigned solTypev = mlSol->GetSolutionType (solIndexv[0]);
+  unsigned solTypeHT = mlSol->GetSolutionType (solIndexHT[0]);
+
+  if (counter == 0) {
+    for (unsigned k = 0; k < NumberOfLayers; k++) {
+      for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+        double valueT = (*sol->_Sol[solIndexT[k]]) (i);
+        double valueH = (*sol->_Sol[solIndexh[k]]) (i);
+
+        double valueTold = (*sol->_SolOld[solIndexT[k]]) (i);
+        double valueHold = (*sol->_SolOld[solIndexh[k]]) (i);
+
+        double valueHT = valueT * valueH;
+        double valueHTold = valueTold * valueHold;
+
+        sol->_Sol[solIndexHT[k]]->set (i, valueHT);
+        sol->_SolOld[solIndexHT[k]]->set (i, valueHTold);
+      }
+
+      sol->_Sol[solIndexHT[k]]->close();
+      sol->_SolOld[solIndexHT[k]]->close();
+    }
+  }
+
+  std::vector < double > maxW (NLayers, -1.e6);
+  maxW[0] = 0.;
+
+  vector < double > solhm (NLayers);
+  vector < double > solh (NLayers);
+  vector < double > solhp (NLayers);
+  vector < double > solvm (NLayers);
+  vector < double > solvp (NLayers);
+  vector < double > solhmm (NLayers);
+  vector < double > solhpp (NLayers);
+
+  vector < double > solHTmm (NLayers);
+  vector < double > solHTpp (NLayers);
+  vector < double > solHT (NLayers);
+  vector < double > solHTp (NLayers);
+  vector < double > solHTm (NLayers);
+
+  //--------------------------------------------------------------------------------------------------------------------------//
+
+  unsigned start = msh->_dofOffset[solTypeHT][iproc];
+  unsigned end = msh->_dofOffset[solTypeHT][iproc + 1];
+
+  //BEGIN FIRST STAGE
+
+  //BEGIN i loop
+  for (unsigned i =  start; i <  end; i++) {
+
+    for (unsigned j = 0; j < NLayers; j++) {
+
+      solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+      solHT[j] = (*sol->_Sol[solIndexHT[j]]) (i);
+
+      solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+      solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+      if (i > start) {
+        solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+        solHTm[j] = (*sol->_Sol[solIndexHT[j]]) (i - 1);
+
+      }
+
+      if (i < end - 1) {
+        solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+        solHTp[j] = (*sol->_Sol[solIndexHT[j]]) (i + 1);
+
+      }
+
+    }
+
+    vector < double > x (2);   // local coordinates
+
+    for (unsigned j = 0; j < 2; j++) {
+      unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+      x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+    }
+
+    double dx = fabs (x[1] - x[0]);
+
+    std::vector < double > w (NLayers + 1, 0.);
+
+    std::vector < double > zTop (NLayers);
+    zTop[0] = 0;
+
+    for (unsigned k = 1; k < NLayers; k++) {
+      zTop[k] = zTop[k - 1] - solh[k];
+    }
+
+    std::vector < double > psi2 (NLayers);
+
+    for (unsigned k = 0; k < NLayers; k++) {
+      //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+      psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+    }
+
+    double xmid = 0.5 * (x[1] + x[0]);
+
+    for (unsigned k = NLayers; k > 1; k--) {
+      w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+      //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+      //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+      //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+      if (maxW[k - 1] < w[k - 1]) {
+        maxW[k - 1] = w[k - 1];
+      }
+    }
+
+
+    for (unsigned k = 0; k < NLayers; k++) {
+      double RHS = 0.;
+
+      //BEGIN HORIZONTAL ADVECTION
+      //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+      //END
+      //BEGIN FIRST ORDER UPWINDING hT multiplied
+      if (i > start) {
+        if (solvm[k] > 0) {
+          RHS += solHTm[k] * solvm[k] / dx;
+        }
+
+        else {
+          RHS += solHT[k] * solvm[k] / dx;
+        }
+      }
+
+      if (i < end - 1) {
+        if (solvp[k] > 0) {
+          RHS -= solHT[k] * solvp[k] / dx;
+        }
+
+        else {
+          RHS -= solHTp[k] * solvp[k] / dx;
+        }
+      }
+
+      //END
+      //END HORIZONTAL ADVECTION
+
+      //BEGIN VERTICAL ADVECTION
+      //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+      //END
+      //BEGIN FIRST ORDER UPWIND hT multiplied
+      if (k < NLayers - 1) {
+        if (w[k + 1] > 0) {
+          RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+        }
+
+        else {
+          RHS += w[k + 1] * (solHT[k] / solh[k]);
+        }
+      }
+
+      if (k > 0) {
+        if (w[k] > 0) {
+          RHS -= w[k] * (solHT[k] / solh[k]);
+        }
+
+        else {
+          RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+        }
+      }
+
+      //END
+      //END VERTICAL ADVECTION
+
+      //BEGIN HORIZONTAL DIFFUSION hT multiplied
+      if (i > start) {
+        RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+      }
+
+      if (i < end - 1) {
+        RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+      }
+
+      //END
+
+      double deltaZt = 0.;
+      double deltaZb = 0.;
+      double ht = 0.;
+      double hb = 0.;
+
+      if (k > 0) {
+        ht = (solh[k - 1] + solh[k]) / 2.;
+        deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+      }
+
+      else {
+        ht = solh[k];
+        deltaZt = 0.* (0. - solHT[k]) / ht;
+      }
+
+      if (k < NLayers - 1) {
+        hb = (solh[k] + solh[k + 1]) / 2.;
+        deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+      }
+
+      else {
+        hb = solh[k];
+        deltaZb = 0.* (solHT[k] - 0.) / hb;
+      }
+
+      RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+      double valueK1 = RHS * dt;
+      sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+      sol->_Sol[solIndexK1[k]]->close();
+
+    }
+
+    //END layer loop
+
+  }
+
+  //END i loop
+
+  //BEGIN UPDATE SOL
+  for (unsigned k = 0; k < NumberOfLayers; k++) {
+    for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+      double h = (*sol->_Sol[solIndexh[k]]) (i);
+      double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+      double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+      double valueh = (*sol->_Sol[solIndexh[k]]) (i);
+
+      double valueHT1st = HTold + K1 ;
+
+      sol->_Sol[solIndexHT1st[k]]->set (i, valueHT1st);
+
+      sol->_Sol[solIndexHT1st[k]]->close();
+
+    }
+  }
+
+  //END UPDATE SOL
+
+  //END FIRST STAGE
+
+  //--------------------------------------------------------------------------------------------------------------------------//
+
+
+  //BEGIN SECOND STAGE
+
+  //BEGIN i loop
+  for (unsigned i =  start; i <  end; i++) {
+
+    for (unsigned j = 0; j < NLayers; j++) {
+
+      solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+      solHT[j] = (*sol->_Sol[solIndexHT1st[j]]) (i);
+
+      solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+      solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+      if (i > start) {
+
+        solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+        solHTm[j] = (*sol->_Sol[solIndexHT1st[j]]) (i - 1);
+
+      }
+
+      if (i < end - 1) {
+
+        short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+        solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+        solHTp[j] = (*sol->_Sol[solIndexHT1st[j]]) (i + 1);
+
+      }
+
+    }
+
+    vector < double > x (2);   // local coordinates
+
+    for (unsigned j = 0; j < 2; j++) {
+      unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+      x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+    }
+
+    double dx = fabs (x[1] - x[0]);
+
+    std::vector < double > w (NLayers + 1, 0.);
+
+    std::vector < double > zTop (NLayers);
+    zTop[0] = 0;
+
+    for (unsigned k = 1; k < NLayers; k++) {
+      zTop[k] = zTop[k - 1] - solh[k];
+    }
+
+    std::vector < double > psi2 (NLayers);
+
+    for (unsigned k = 0; k < NLayers; k++) {
+      //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+      psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+    }
+
+    double xmid = 0.5 * (x[1] + x[0]);
+
+    for (unsigned k = NLayers; k > 1; k--) {
+      w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+      //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+      //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+      //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+      if (maxW[k - 1] < w[k - 1]) {
+        maxW[k - 1] = w[k - 1];
+      }
+    }
+
+
+    for (unsigned k = 0; k < NLayers; k++) {
+      double RHS = 0.;
+
+      //BEGIN HORIZONTAL ADVECTION
+      //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+      //END
+      //BEGIN FIRST ORDER UPWINDING hT multiplied
+      if (i > start) {
+        if (solvm[k] > 0) {
+          RHS += solHTm[k] * solvm[k] / dx;
+        }
+
+        else {
+          RHS += solHT[k] * solvm[k] / dx;
+        }
+      }
+
+      if (i < end - 1) {
+        if (solvp[k] > 0) {
+          RHS -= solHT[k] * solvp[k] / dx;
+        }
+
+        else {
+          RHS -= solHTp[k] * solvp[k] / dx;
+        }
+      }
+
+      //END
+      //END HORIZONTAL ADVECTION
+
+
+
+      //BEGIN VERTICAL ADVECTION
+      //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+      //END
+      //BEGIN FIRST ORDER UPWIND hT multiplied
+      if (k < NLayers - 1) {
+        if (w[k + 1] > 0) {
+          RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+        }
+
+        else {
+          RHS += w[k + 1] * (solHT[k] / solh[k]);
+        }
+      }
+
+      if (k > 0) {
+        if (w[k] > 0) {
+          RHS -= w[k] * (solHT[k] / solh[k]);
+        }
+
+        else {
+          RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+        }
+      }
+
+      //END
+      //END VERTICAL ADVECTION
+
+      //BEGIN HORIZONTAL DIFFUSION hT multiplied
+      if (i > start) {
+        RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+      }
+
+      if (i < end - 1) {
+        RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+      }
+
+      //END
+
+      double deltaZt = 0.;
+      double deltaZb = 0.;
+      double ht = 0.;
+      double hb = 0.;
+
+      if (k > 0) {
+        ht = (solh[k - 1] + solh[k]) / 2.;
+        deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+      }
+
+      else {
+        ht = solh[k];
+        deltaZt = 0.* (0. - solHT[k]) / ht;
+      }
+
+      if (k < NLayers - 1) {
+        hb = (solh[k] + solh[k + 1]) / 2.;
+        deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+      }
+
+      else {
+        hb = solh[k];
+        deltaZb = 0.* (solHT[k] - 0.) / hb;
+      }
+
+      RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+      double valueK1;
+      if (LTS_order == 2) valueK1 = 0.5 * RHS * dt;
+      else if (LTS_order == 3) valueK1 = 0.25 * RHS * dt;
+      sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+      sol->_Sol[solIndexK1[k]]->close();
+
+    }
+    //END layer loop
+
+  }
+  //END i loop
+
+  //BEGIN UPDATE SOL
+  for (unsigned k = 0; k < NumberOfLayers; k++) {
+    for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+      double h = (*sol->_Sol[solIndexh[k]]) (i);
+      double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+      double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+      double HT1stStage = (*sol->_Sol[solIndexHT1st[k]]) (i);
+
+      double valueHT;
+
+      if (LTS_order == 2) {
+        valueHT = 0.5 * HTold + 0.5 * HT1stStage + K1 ;
+        sol->_Sol[solIndexHT[k]]->set (i, valueHT);
+        sol->_Sol[solIndexHT[k]]->close();
+      }
+
+      else if (LTS_order == 3) {
+        valueHT =  0.75 * HTold + 0.25 * HT1stStage + K1;
+        sol->_Sol[solIndexHT2nd[k]]->set (i, valueHT);
+        sol->_Sol[solIndexHT2nd[k]]->close();
+      }
+
+    }
+  }
+
+  //END UPDATE SOL
+
+  //END SECOND STAGE
+  
+  //--------------------------------------------------------------------------------------------------------------------------//
+  
+  //BEGIN THIRD STAGE if LTS_order == 3
+
+  if (LTS_order == 3) {
+
+    //BEGIN i loop
+    for (unsigned i =  start; i <  end; i++) {
+
+      for (unsigned j = 0; j < NLayers; j++) {
+
+        solh[j] = (*sol->_Sol[solIndexh[j]]) (i);
+        solHT[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i);
+
+        solvm[j] = (*sol->_Sol[solIndexv[j]]) (i);
+        solvp[j] = (*sol->_Sol[solIndexv[j]]) (i + 1);
+
+        if (i > start) {
+
+          solhm[j] = (*sol->_Sol[solIndexh[j]]) (i - 1);
+
+          solHTm[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i - 1);
+
+        }
+
+        if (i < end - 1) {
+
+          short unsigned ielpGroup = msh->GetElementGroup (i + 1); //NOTE this operation has to be dealt with in parallel
+
+          solhp[j] = (*sol->_Sol[solIndexh[j]]) (i + 1);
+
+          solHTp[j] = (*sol->_Sol[solIndexHT2nd[j]]) (i + 1);
+
+        }
+
+      }
+
+      vector < double > x (2);   // local coordinates
+
+      for (unsigned j = 0; j < 2; j++) {
+        unsigned xDof  = msh->GetSolutionDof (j, i, 2);   // global to global mapping between coordinates node and coordinate dof
+        x[j] = (*msh->_topology->_Sol[0]) (xDof);     // global extraction and local storage for the element coordinates
+      }
+
+      double dx = fabs (x[1] - x[0]);
+
+      std::vector < double > w (NLayers + 1, 0.);
+
+      std::vector < double > zTop (NLayers);
+      zTop[0] = 0;
+
+      for (unsigned k = 1; k < NLayers; k++) {
+        zTop[k] = zTop[k - 1] - solh[k];
+      }
+
+      std::vector < double > psi2 (NLayers);
+
+      for (unsigned k = 0; k < NLayers; k++) {
+        //psi2[k] = ( - ( zMid[k] + 10 ) * zMid[k] ) / 25;
+        psi2[k] = 1. - (zTop[k] + 5.) * (zTop[k] + 5.) / (25.);
+      }
+
+      double xmid = 0.5 * (x[1] + x[0]);
+
+      for (unsigned k = NLayers; k > 1; k--) {
+        w[k - 1] = - (-4. / 625.* (xmid - 5) * (xmid - 5) * (xmid - 5)) * psi2[k - 1]; //10x10 box test
+        //w[k - 1] = - (- 16. / (pow (20., 16)) * pow ( (xmid - 20.), 15)) * psi2[k - 1]; //40x10 rectangle test
+
+        //w[k - 1] = - ( - 16./(pow(10.,16)) * pow((xmid - 10.), 15) ) * psi2[k - 1];
+        //w[k - 1] = ( ( 10. - 2. * xmid ) / 25. ) * psi2[k - 1];
+        if (maxW[k - 1] < w[k - 1]) {
+          maxW[k - 1] = w[k - 1];
+        }
+      }
+
+
+      for (unsigned k = 0; k < NLayers; k++) {
+        double RHS = 0.;
+
+        //BEGIN HORIZONTAL ADVECTION
+        //BEGIN CENTRAL DIFF hT multiplied
+//                         if ( i > start ) {
+//                             RHS += 0.5 * ( solHTm[k] + solHT[k] ) * solvm[k]  / dx;
+//                         }
+//                         if ( i < end - 1 ) {
+//                             RHS -= 0.5 * (solHT[k] + solHTp[k] ) * solvp[k]  / dx;
+//                         }
+        //END
+        //BEGIN FIRST ORDER UPWINDING hT multiplied
+        if (i > start) {
+          if (solvm[k] > 0) {
+            RHS += solHTm[k] * solvm[k] / dx;
+          }
+
+          else {
+            RHS += solHT[k] * solvm[k] / dx;
+          }
+        }
+
+        if (i < end - 1) {
+          if (solvp[k] > 0) {
+            RHS -= solHT[k] * solvp[k] / dx;
+          }
+
+          else {
+            RHS -= solHTp[k] * solvp[k] / dx;
+          }
+        }
+
+        //END
+        //END HORIZONTAL ADVECTION
+
+
+
+        //BEGIN VERTICAL ADVECTION
+        //BEGIN CENTRAL DIFF hT multiplied
+//                 if ( k < NLayers - 1 ) {
+//                   RHS += w[k + 1] * 0.5 * ( solHT[k]  / solh[k] +  solHT[k + 1]  / solh[k + 1] );
+//                 }
+//                 if ( k > 0 ) {
+//                   RHS -= w[k] * 0.5 * ( solHT[k - 1]  / solh[k - 1] +  solHT[k] / solh[k] );
+//                 }
+        //END
+        //BEGIN FIRST ORDER UPWIND hT multiplied
+        if (k < NLayers - 1) {
+          if (w[k + 1] > 0) {
+            RHS += w[k + 1] * (solHT[k + 1] / solh[k + 1]);
+          }
+
+          else {
+            RHS += w[k + 1] * (solHT[k] / solh[k]);
+          }
+        }
+
+        if (k > 0) {
+          if (w[k] > 0) {
+            RHS -= w[k] * (solHT[k] / solh[k]);
+          }
+
+          else {
+            RHS -= w[k] * (solHT[k - 1] / solh[k - 1]);
+          }
+        }
+
+        //END
+        //END VERTICAL ADVECTION
+
+        //BEGIN HORIZONTAL DIFFUSION hT multiplied
+        if (i > start) {
+          RHS += k_h * (0.5 * (solhm[k] + solh[k])) * (solHTm[k]  / solhm[k]  - solHT[k]  / solh[k]) / (dx * dx);
+        }
+
+        if (i < end - 1) {
+          RHS += k_h * (0.5 * (solhp[k] + solh[k])) * (solHTp[k] / solhp[k]  - solHT[k] / solh[k]) / (dx * dx);
+        }
+
+        //END
+
+        double deltaZt = 0.;
+        double deltaZb = 0.;
+        double ht = 0.;
+        double hb = 0.;
+
+        if (k > 0) {
+          ht = (solh[k - 1] + solh[k]) / 2.;
+          deltaZt = (solHT[k - 1] / solh[k - 1] - solHT[k] / solh[k]) / ht;
+        }
+
+        else {
+          ht = solh[k];
+          deltaZt = 0.* (0. - solHT[k]) / ht;
+        }
+
+        if (k < NLayers - 1) {
+          hb = (solh[k] + solh[k + 1]) / 2.;
+          deltaZb = (solHT[k] / solh[k] - solHT[k + 1]  / solh[k + 1]) / hb;
+        }
+
+        else {
+          hb = solh[k];
+          deltaZb = 0.* (solHT[k] - 0.) / hb;
+        }
+
+        RHS += solh[k] * k_v * (deltaZt - deltaZb) / ( (ht + hb) / 2.);      // vertical diffusion
+
+        double valueK1 = (2. / 3.) * RHS * dt;
+        sol->_Sol[solIndexK1[k]]->set (i, valueK1);
+        sol->_Sol[solIndexK1[k]]->close();
+
+      }
+      //END layer loop
+
+    }
+    //END i loop
+
+    //BEGIN UPDATE SOL
+    for (unsigned k = 0; k < NumberOfLayers; k++) {
+      for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+        double h = (*sol->_Sol[solIndexh[k]]) (i);
+        double K1 = (*sol->_Sol[solIndexK1[k]]) (i);
+
+        double HTold = (*sol->_SolOld[solIndexHT[k]]) (i);
+        double HT2ndStage = (*sol->_Sol[solIndexHT2nd[k]]) (i);
+
+        double valueHT = (1. / 3.) * HTold + (2. / 3.) * HT2ndStage + K1 ;
+        sol->_Sol[solIndexHT[k]]->set (i, valueHT);
+        sol->_Sol[solIndexHT[k]]->close();
+
+      }
+    }
+
+    //END UPDATE SOL
+
+  }
+
+  //END SSP_RK
+
+  //--------------------------------------------------------------------------------------------------------------------------//
+
+//BEGIN SET AND PRINT T
+
+  for (unsigned k = 0; k < NumberOfLayers; k++) {
+    for (unsigned i =  msh->_dofOffset[solTypeHT][iproc]; i <  msh->_dofOffset[solTypeHT][iproc + 1]; i++) {
+
+      double valueHT = (*sol->_Sol[solIndexHT[k]]) (i);
+      double valueh = (*sol->_Sol[solIndexh[k]]) (i);
+
+      double valueT = valueHT / valueh;
+
+      sol->_Sol[solIndexT[k]]->set (i, valueT);
+
+      sol->_Sol[solIndexT[k]]->close();
+
+      std::cout.precision (14);
+
+      if (counter == numberOfTimeSteps - 1) {
+        std::cout << valueT << std::endl;
+      }
+    }
+  }
+
+  //END
+
+
 }
 
 void assignMeshElementsGroups (MultiLevelSolution & mlSol) {
@@ -5521,6 +7875,7 @@ void assignMeshElementsGroups (MultiLevelSolution & mlSol) {
   //END
 
 }
+
 
 
 
