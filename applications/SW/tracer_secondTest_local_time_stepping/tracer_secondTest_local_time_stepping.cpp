@@ -17,7 +17,7 @@
 using namespace femus;
 
 unsigned numberOfTimeSteps = 800; //RK4: dt=0.5, numberOfTimeSteps = 16001
-double dt = 0.00025; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
+double dt = 0.025; //max for LTS (with 20 layers and [0,10] with nx=20) is dt=1.1
 unsigned M = 4;
 
 double k_v = (2.5) * (0.00001);
@@ -61,6 +61,16 @@ const double hRest[20] = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
 //                            0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
 //                            0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1
 //                          };
+
+bool SetRefinementFlag(const std::vector < double >& x, const int& elemgroupnumber, const int& level) {
+
+  bool refine = 0;
+
+  if (x[0] <= 2.5) refine = 1;
+
+  return refine;
+
+}
 
 double InitalValueVi (const std::vector < double >& x, const unsigned &i) {
   double psi1 = 1. - (x[0] - 5.) * (x[0] - 5.) * (x[0] - 5.) * (x[0] - 5.) / (5.*5.*5.*5.); //10x10 box test
@@ -460,14 +470,14 @@ int main (int argc, char** args) {
   double scalingFactor = 1.;
 
   unsigned numberOfUniformLevels = 1;
-  unsigned numberOfSelectiveLevels = 0;
+  unsigned numberOfSelectiveLevels = 1;
   unsigned nx = 20;
   double xMax = 10.;
   double xMin = 0.;
 
   mlMsh.GenerateCoarseBoxMesh (nx, 0, 0, xMin, xMax, 0., 0., 0., 0., EDGE3, "seventh");
 
-  //mlMsh.RefineMesh(numberOfUniformLevels + numberOfSelectiveLevels, numberOfUniformLevels , NULL);
+  mlMsh.RefineMesh(numberOfUniformLevels + numberOfSelectiveLevels, numberOfUniformLevels , SetRefinementFlag);
   mlMsh.PrintInfo();
 
   // define the multilevel solution and attach the mlMsh object to it
@@ -5015,7 +5025,7 @@ void LTS (MultiLevelProblem& ml_prob, const unsigned & M, const unsigned & numbe
 
     unsigned start = msh->_dofOffset[solTypeHT][iproc];
     unsigned end = msh->_dofOffset[solTypeHT][iproc + 1];
-
+    
     //BEGIN FIRST STAGE (interface prediction)
 
     //BEGIN FIRST STEP OF FIRST STAGE
